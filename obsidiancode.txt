@@ -1,0 +1,399 @@
+// DataviewJS: Medicine (minutes → hours) tracker with daily/weekly/monthly goals shown on chart (goal lines in gold)
+
+const pages = dv.pages('"Daily Notes"').array();
+const entries = [];
+
+// --- Extract entries from file names like DD-MM-YYYY ---
+for (let p of pages) {
+if (!p.file?.name) continue;
+const match = p.file.name.match(/^(\d{2})-(\d{2})-(\d{4})/); if (!match) continue; const [_, dStr, mStr, yStr] = match; const d = Number(dStr), m = Number(mStr), y = Number(yStr); const date = new Date(y, m - 1, d); if (isNaN(date)) continue; let medRaw = p.Medicine ?? 0; let minutes = 0; if (typeof medRaw === 'number') { minutes = medRaw; } else if (typeof medRaw === 'string') { const hhmm = medRaw.match(/^(\d+):(\d{1,2})/);
+if (hhmm) minutes = Number(hhmm[1]) 60 + Number(hhmm[2]);
+else {
+const asNum = Number(medRaw.replace(',', '.'));
+if (!isNaN(asNum)) minutes = (asNum <= 12) ? Math.round(asNum 60) : Math.round(asNum);
+else minutes = 0;
+}
+}
+minutes = Math.max(0, minutes);
+const hours = +(minutes / 60);
+entries.push({ date, minutes, medicineHours: hours });
+}
+
+// --- CONFIG ---
+const START_DATE = new Date(2026, 0, 1);
+const DAILY_GOAL = 5; // hours
+const WEEKLY_GOAL = 35; // hours
+const MONTHLY_GOAL = 150; // hours
+const filtered = entries.filter(e => e.date >= START_DATE);
+
+let endDate = filtered.length ? filtered.reduce((a,b) => a.date > b.date ? a : b).date : new Date();
+if (endDate < new Date()) endDate = new Date();
+endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+const filled = [];
+let cursor = new Date(START_DATE);
+while (cursor <= endDate) {
+const found = filtered.find(e => e.date.getFullYear() = cursor.getFullYear()
+&& e.date.getMonth() = cursor.getMonth()
+&& e.date.getDate() === cursor.getDate());
+filled.push({
+date: new Date(cursor),
+minutes: found ? found.minutes : 0,
+medicineHours: +(found ? found.medicineHours : 0)
+});
+cursor.setDate(cursor.getDate() + 1);
+}
+
+// --- Helpers ---
+function getISOWeekYearKey(dt) {
+const date = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay()||7));
+const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+return ${date.getUTCFullYear()}-W${String(weekNo).padStart(2,'0')};
+}
+function pctColor(pct) {
+if (pct >= 1) return '#27ae60'; // green
+if (pct >= 0.7) return '#f39c12'; // orange
+return '#e74c3c'; // red
+}
+
+// --- Aggregations ---
+const weeklyStats = {};
+const monthlyStats = {};
+const dailyLabels = filled.map(f => f.date.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
+const dailyValues = filled.map(f => +f.medicineHours.toFixed(2));
+
+for (let f of filled) {
+const wKey = getISOWeekYearKey(f.date);
+if (!weeklyStats[wKey]) weeklyStats[wKey] = { hours: 0, minutes:0, daysWithStudy:0, start: new Date(f.date), end: new Date(f.date) };
+weeklyStats[wKey].hours += f.medicineHours;
+weeklyStats[wKey].minutes += f.minutes;
+weeklyStats[wKey].daysWithStudy += (f.medicineHours > 0 ? 1 : 0);
+if (f.date < weeklyStats[wKey].start) weeklyStats[wKey].start = new Date(f.date);
+if (f.date > weeklyStats[wKey].end) weeklyStats[wKey].end = new Date(f.date);
+
+const mKey = f.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+if (!monthlyStats[mKey]) monthlyStats[mKey] = { hours:0, minutes:0, daysWithStudy:0 };
+monthlyStats[mKey].hours += f.medicineHours;
+monthlyStats[mKey].minutes += f.minutes;
+monthlyStats[mKey].daysWithStudy += (f.medicineHours > 0 ? 1 : 0);
+
+}
+
+// --- Prepare arrays for charts/tables ---
+const weekKeysSorted = Object.keys(weeklyStats).sort();
+const weekValues = weekKeysSorted.map(k => +weeklyStats[k].hours.toFixed(2));
+
+const monthKeysSorted = Object.keys(monthlyStats).sort((a,b)=>{
+const pa = new Date(a);
+const pb = new Date(b);
+return pa - pb;
+});
+const monthValues = monthKeysSorted.map(k => +monthlyStats[k].hours.toFixed(2));
+
+// --- CHART (daily + daily goal + weekly totals + monthly totals + weekly & monthly goal lines; goals in gold) ---
+const canvas = dv.container.createEl("canvas");
+canvas.style.height = "480px";
+new Chart(canvas.getContext("2d"), {
+type: 'line',
+data: {
+labels: dailyLabels,
+datasets: [
+{ label: 'Ημερήσιες Ώρες', data: dailyValues, borderColor: '#2c3e50', backgroundColor: 'rgba(44,62,80,0.10)', fill: true, tension: 0.12, pointRadius: 2 },
+{ label: Ημερήσιος Στόχος (${DAILY_GOAL}h), data: new Array(dailyValues.length).fill(DAILY_GOAL), borderColor: 'black', backgroundColor: 'rgba(218,165,32,0.06)', fill:false, pointRadius:0, tension:0 },
+{ label: Εβδομαδιαίες Ώρες, data: (() => {
+const map = {}; weekKeysSorted.forEach((k,i)=> map[k]=weekValues[i]);
+return filled.map(f => map[getISOWeekYearKey(f.date)] ?? 0);
+})(), borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)', fill:false, tension:0.12, pointRadius:0 },
+{ label: Εβδομαδιαίος Στόχος (${WEEKLY_GOAL}h), data: new Array(dailyValues.length).fill(WEEKLY_GOAL), borderColor: 'black', backgroundColor: 'rgba(218,165,32,0.06)', fill:false, pointRadius:0, tension:0 },
+{ label: Μηνιαίες Ώρες, data: (() => {
+const map = {}; monthKeysSorted.forEach((k,i)=> map[k]=monthValues[i]);
+return filled.map(f => map[f.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })] ?? 0);
+})(), borderColor: '#8e44ad', backgroundColor: 'rgba(142,68,173,0.06)', fill:false, tension:0.12, pointRadius:0 },
+{ label: Μηνιαίος Στόχος (${MONTHLY_GOAL}h), data: new Array(dailyValues.length).fill(MONTHLY_GOAL), borderColor: 'gold', backgroundColor: 'rgba(218,165,32,0.06)', fill:false, pointRadius:0, tension:0 }
+]
+},
+options: {
+responsive:true,
+plugins: {
+tooltip: {
+mode:'index',
+intersect:false,
+callbacks: {
+label: function(ctx) {
+const v = ctx.parsed.y;
+return ${ctx.dataset.label}: ${v} h;
+}
+}
+},
+legend: { labels: { boxWidth:12 } }
+},
+scales: { y: { title: { display:true, text:'Hours' } } }
+}
+});
+
+// --- Summary header ---
+dv.header(2, 📚 Medicine Tracker — Goals: daily ${DAILY_GOAL}h · weekly ${WEEKLY_GOAL}h · monthly ${MONTHLY_GOAL}h);
+
+// Overall totals
+const totalHours = dailyValues.reduce((a,b)=>a+b,0);
+const totalMinutes = filled.reduce((a,b)=>a+b.minutes,0);
+const daysWithStudy = filled.filter(f => f.medicineHours > 0).length;
+dv.table(["Κατηγορία","Τιμή"], [
+["🕒 Σύνολο ωρών", ${totalHours.toFixed(2)} h],
+["✳️ Σύνολο λεπτών (αρχικά)", ${totalMinutes} min],
+["📅 Ημέρες με διάβασμα", ${daysWithStudy}],
+["📈 Μέσο/ημέρα (όλων των ημερών)", ${(totalHours / filled.length).toFixed(2)} h],
+["📈 Μέσο/ημέρα (μόνο μέρες με διάβασμα)", ${(daysWithStudy? (totalHours/daysWithStudy).toFixed(2) : "0.00")} h]
+]);
+
+// --- PROGRESS CALCULATIONS (added) ---
+// Daily progress: average per day across all days vs DAILY_GOAL
+const avgPerDayAll = (filled.length ? (totalHours / filled.length) : 0);
+const dailyProgressPct = Math.max(0, Math.min(1, avgPerDayAll / DAILY_GOAL));
+
+// Weekly progress: most recent ISO week vs WEEKLY_GOAL
+let lastWeekProgressPct = 0;
+let lastWeekHours = 0;
+if (weekKeysSorted.length) {
+const lastWeekKey = weekKeysSorted[weekKeysSorted.length - 1];
+lastWeekHours = weeklyStats[lastWeekKey]?.hours ?? 0;
+lastWeekProgressPct = Math.max(0, Math.min(1, lastWeekHours / WEEKLY_GOAL));
+}
+
+// Monthly progress: current month vs MONTHLY_GOAL
+const currentMonthKey = (new Date()).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+const currentMonthHours = monthlyStats[currentMonthKey]?.hours ?? 0;
+const monthlyProgressPct = Math.max(0, Math.min(1, currentMonthHours / MONTHLY_GOAL));
+
+// --- Render progress bars ---
+function renderProgressBar(pct, color, label, hoursValue, goalValue) {
+const pctNum = Math.round(pct * 100);
+const outer = <div style="margin:6px 0;font-family:inherit"> +
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"> +
+<div style="font-weight:600">${label}</div> +
+<div style="font-size:0.9em;color:#444">${hoursValue.toFixed(2)} / ${goalValue} h (${pctNum}%)</div> +
+</div> +
+<div style="background:#eee;border-radius:8px;height:16px;overflow:hidden;width:100%;max-width:520px"> +
+<div style="width:${pctNum}%;height:100%;background:${color};transition:width 0.4s"></div> +
+</div> +
+</div>;
+return outer;
+}
+
+dv.header(3, "📊 Πρόοδος — Οπτικές Μπάρες");
+dv.paragraph(renderProgressBar(dailyProgressPct, pctColor(dailyProgressPct), Ημερήσια (μέσο/ημέρα), avgPerDayAll, DAILY_GOAL));
+dv.paragraph(renderProgressBar(lastWeekProgressPct, pctColor(lastWeekProgressPct), Εβδομαδιαία (τελευταία εβδομάδα), lastWeekHours, WEEKLY_GOAL));
+dv.paragraph(renderProgressBar(monthlyProgressPct, pctColor(monthlyProgressPct), Μηνιαία (τρέχων μήνας), currentMonthHours, MONTHLY_GOAL));
+
+// --- Weekly table with goal progress and colored badge (vs WEEKLY_GOAL) ---
+dv.header(3, "🗓️ Εβδομαδιαία Σύνοψη & Πρόοδος (στόχος εβδομάδας)");
+const weeklyRows = weekKeysSorted.slice().reverse().map(k => {
+const w = weeklyStats[k];
+const hours = +w.hours.toFixed(2);
+const pct = Math.max(0, Math.min(1, hours / WEEKLY_GOAL));
+const pctStr = ${(pct*100).toFixed(0)}%;
+const color = pctColor(pct);
+const barWidth = Math.min(100, Math.round(pct*100));
+const badge = <span style="color:white;background:${color};padding:3px 8px;border-radius:12px;font-weight:600">${pctStr}</span>;
+const bar = <div style="background:#eee;height:10px;border-radius:6px;width:120px"><div style="width:${barWidth}%;height:10px;background:${color};border-radius:6px"></div></div>;
+return [
+${k} (${w.start.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}–${w.end.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}),
+${hours.toFixed(2)} h,
+${w.daysWithStudy} days,
+badge,
+bar
+];
+});
+dv.table(["Εβδομάδα","Ώρες","Ημέρες με διάβασμα","Ποσοστό επίτευξης","Οπτική"], weeklyRows);
+
+// --- Monthly table with goal progress (vs MONTHLY_GOAL) ---
+dv.header(3, "📆 Μηνιαία Σύνοψη & Πρόοδος (στόχος μήνα)");
+const monthlyRows = monthKeysSorted.slice().reverse().map(k => {
+const m = monthlyStats[k];
+const hours = +m.hours.toFixed(2);
+const pct = Math.max(0, Math.min(1, hours / MONTHLY_GOAL));
+const pctStr = ${(pct*100).toFixed(0)}%;
+const color = pctColor(pct);
+const badge = <span style="color:white;background:${color};padding:3px 8px;border-radius:12px;font-weight:600">${pctStr}</span>;
+const md = new Date(k);
+const daysInMonth = new Date(md.getFullYear(), md.getMonth()+1, 0).getDate();
+return [
+k,
+${hours.toFixed(2)} h,
+${m.daysWithStudy} days,
+badge,
+${(hours / daysInMonth).toFixed(2)} h/day
+];
+});
+dv.table(["Μήνας","Ώρες","Ημέρες με διάβασμα","Ποσοστό επίτευξης","Μέσο/ημέρα"], monthlyRows);
+
+// ====================================
+// 🔁 Σύγκριση ημέρας με ΟΛΕΣ τις προηγούμενες εβδομάδες
+// ====================================
+
+dv.header(3, "📊 Σύγκριση με όλες τις προηγούμενες εβδομάδες");
+
+const greekDays = [
+"Κυριακή",
+"Δευτέρα",
+"Τρίτη",
+"Τετάρτη",
+"Πέμπτη",
+"Παρασκευή",
+"Σάββατο"
+];
+
+// --- Βρίσκουμε τη Δευτέρα της τρέχουσας εβδομάδας
+const today = new Date();
+
+const currentWeekMonday = new Date(today);
+const day = currentWeekMonday.getDay();
+const diffToMonday = (day === 0 ? -6 : 1 - day);
+
+currentWeekMonday.setDate(currentWeekMonday.getDate() + diffToMonday);
+currentWeekMonday.setHours(0,0,0,0);
+
+// --- Helper: ώρες για συγκεκριμένη ημερομηνία
+function getHoursForDate(dateObj) {
+const found = filled.find(f =>
+f.date.getFullYear() = dateObj.getFullYear() &&
+f.date.getMonth() = dateObj.getMonth() &&
+f.date.getDate() === dateObj.getDate()
+);
+
+return found ? found.medicineHours : 0;
+
+}
+
+// ====================================
+// START DATE FOR COMPARISON
+// ====================================
+
+// 1 March 2026
+const COMPARISON_START_DATE = new Date(2026, 3, 1);
+
+// ====================================
+// Δημιουργία πίνακα σύγκρισης
+// ====================================
+
+const comparisonRows = [];
+
+for (let i = 0; i < 7; i++) {
+
+// Ημέρα της τρέχουσας εβδομάδας
+const currentDate = new Date(currentWeekMonday);
+currentDate.setDate(currentDate.getDate() + i);
+
+const currentHours = getHoursForDate(currentDate);
+
+// ----------------------------------
+// Συλλογή ΟΛΩΝ των προηγούμενων ίδιων ημερών
+// ----------------------------------
+
+const previousValues = [];
+
+let previousDate = new Date(currentDate);
+previousDate.setDate(previousDate.getDate() - 7);
+
+while (previousDate >= COMPARISON_START_DATE) {
+
+    const hours = getHoursForDate(previousDate);
+
+    previousValues.push(hours);
+
+    previousDate.setDate(previousDate.getDate() - 7);
+}
+
+// ----------------------------------
+// Στατιστικά
+// ----------------------------------
+
+const totalPrevious = previousValues.reduce((a, b) => a + b, 0);
+
+const avgPrevious = previousValues.length
+    ? totalPrevious / previousValues.length
+    : 0;
+
+const bestPrevious = previousValues.length
+    ? Math.max(...previousValues)
+    : 0;
+
+const diff = currentHours - avgPrevious;
+
+const pctChange = avgPrevious > 0
+    ? ((diff / avgPrevious) * 100)
+    : 0;
+
+// ----------------------------------
+// Trend
+// ----------------------------------
+
+let trend = "→";
+let trendColor = "#7f8c8d";
+
+if (diff > 0.25) {
+    trend = "↑";
+    trendColor = "#27ae60";
+}
+else if (diff < -0.25) {
+    trend = "↓";
+    trendColor = "#e74c3c";
+}
+
+const trendBadge =
+    `<span style="
+        color:white;
+        background:${trendColor};
+        padding:4px 10px;
+        border-radius:12px;
+        font-weight:700;
+    ">${trend}</span>`;
+
+// ----------------------------------
+// Consistency score
+// ----------------------------------
+
+const daysStudied = previousValues.filter(v => v > 0).length;
+
+const consistency = previousValues.length
+    ? Math.round((daysStudied / previousValues.length) * 100)
+    : 0;
+
+// ----------------------------------
+// Row
+// ----------------------------------
+
+comparisonRows.push([
+    greekDays[currentDate.getDay()],
+    `${currentHours.toFixed(2)} h`,
+    `${avgPrevious.toFixed(2)} h`,
+    `${bestPrevious.toFixed(2)} h`,
+    `${previousValues.length}`,
+    `${consistency}%`,
+    `${diff >= 0 ? "+" : ""}${diff.toFixed(2)} h`,
+    `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(0)}%`,
+    trendBadge
+]);
+
+}
+
+// ====================================
+// Render Table
+// ====================================
+
+dv.table(
+[
+"Ημέρα",
+"Αυτή εβδομάδα",
+"Μ.Ο όλων",
+"Καλύτερη επίδοση",
+"Σύνολο εβδομάδων",
+"Consistency",
+"Διαφορά",
+"% Μεταβολή",
+"Trend"
+],
+comparisonRows
+);

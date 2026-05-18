@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grind Grid</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;padding:2rem 1rem}
+.container{max-width:1000px;margin:0 auto}
+h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
+.subtitle{text-align:center;color:#64748b;margin-bottom:2rem;font-size:0.9rem}
+.chart-wrapper{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1.5rem;margin-bottom:2rem}
+.chart-title{font-size:1.1rem;font-weight:600;margin-bottom:1rem;text-transform:capitalize}
+.chart-wrapper canvas{width:100%!important;height:450px!important}
+.error{text-align:center;padding:2rem;color:#dc2626;background:#fef2f2;border-radius:8px;border:1px solid #fecaca}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Grind Grid</h1>
+<p class="subtitle">Habit tracking comparison</p>
+<div id="charts"></div>
+</div>
+<script>
+function renderChart(canvas, data, goals) {
+  new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [
+        {
+          label: 'Daily Hours',
+          data: data.daily,
+          borderColor: '#2c3e50',
+          backgroundColor: 'rgba(44,62,80,0.10)',
+          fill: true,
+          tension: 0.12,
+          pointRadius: 1.5
+        },
+        {
+          label: 'Daily Goal (' + goals.daily + 'h)',
+          data: new Array(data.labels.length).fill(goals.daily),
+          borderColor: 'black',
+          backgroundColor: 'rgba(218,165,32,0.06)',
+          fill: false,
+          pointRadius: 0,
+          tension: 0
+        },
+        {
+          label: 'Weekly Hours',
+          data: data.weeklyLine,
+          borderColor: '#27ae60',
+          backgroundColor: 'rgba(39,174,96,0.06)',
+          fill: false,
+          tension: 0.12,
+          pointRadius: 0
+        },
+        {
+          label: 'Weekly Goal (' + goals.weekly + 'h)',
+          data: new Array(data.labels.length).fill(goals.weekly),
+          borderColor: 'black',
+          backgroundColor: 'rgba(218,165,32,0.06)',
+          fill: false,
+          pointRadius: 0,
+          tension: 0
+        },
+        {
+          label: 'Monthly Hours',
+          data: data.monthlyLine,
+          borderColor: '#8e44ad',
+          backgroundColor: 'rgba(142,68,173,0.06)',
+          fill: false,
+          tension: 0.12,
+          pointRadius: 0
+        },
+        {
+          label: 'Monthly Goal (' + goals.monthly + 'h)',
+          data: new Array(data.labels.length).fill(goals.monthly),
+          borderColor: 'gold',
+          backgroundColor: 'rgba(218,165,32,0.06)',
+          fill: false,
+          pointRadius: 0,
+          tension: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + ' h';
+            }
+          }
+        },
+        legend: {
+          labels: { boxWidth: 12, font: { size: 11 } }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { maxTicksLimit: 25, font: { size: 10 } }
+        },
+        y: {
+          title: { display: true, text: 'Hours' },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+async function init() {
+  try {
+    const res = await fetch('data.json');
+    if (!res.ok) throw new Error('Failed to load data.json');
+    const json = await res.json();
+    const container = document.getElementById('charts');
+
+    for (const user of json.users) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'chart-wrapper';
+
+      const title = document.createElement('div');
+      title.className = 'chart-title';
+      title.textContent = user.displayName + ' \u2014 ' + user.habitTitle;
+      wrapper.appendChild(title);
+
+      const canvas = document.createElement('canvas');
+      wrapper.appendChild(canvas);
+      container.appendChild(wrapper);
+
+      renderChart(canvas, user, json.goals);
+    }
+  } catch (err) {
+    document.getElementById('charts').innerHTML = '<div class="error">' + err.message + '</div>';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

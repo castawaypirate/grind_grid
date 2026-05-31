@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grind Grid — Challenge</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f1a;color:#e2e8f0;padding:2rem 1rem}
+.container{max-width:900px;margin:0 auto}
+.nav{text-align:center;margin-bottom:1.5rem}
+.nav a{color:#94a3b8;text-decoration:none;font-size:0.9rem}
+.nav a:hover{color:#fff}
+h1{font-size:1.75rem;font-weight:700;text-align:center}
+.subtitle{text-align:center;color:#94a3b8;margin-bottom:0.5rem;font-size:0.9rem}
+.updated{text-align:center;color:#64748b;margin-bottom:2rem;font-size:0.8rem}
+.leader-card{background:linear-gradient(135deg,#1e1e2e,#2a2a3e);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.leader-card.rank-1{border-color:rgba(255,215,0,0.3);background:linear-gradient(135deg,#1a1a2e,#2a2a1e)}
+.leader-card.rank-2{border-color:rgba(192,192,192,0.2)}
+.leader-card.rank-3{border-color:rgba(205,127,50,0.2)}
+.rank-row{display:flex;align-items:center;gap:14px}
+.rank-badge{font-size:1.6rem;width:44px;text-align:center}
+.rank-1 .rank-badge{font-size:2rem}
+.player-info{flex:1}
+.player-name{font-size:1.2rem;font-weight:600}
+.player-habit{font-size:0.8rem;color:#94a3b8;margin-top:2px}
+.total-hours{font-size:1.8rem;font-weight:700;text-align:right;min-width:120px}
+.total-hours small{font-size:0.8rem;font-weight:400;color:#94a3b8}
+.progress-wrap{background:#333;height:10px;border-radius:8px;overflow:hidden;margin-top:8px}
+.progress-bar{height:100%;border-radius:8px;transition:width 0.6s}
+.achievement{margin-top:10px;font-size:0.9rem;padding:6px 12px;border-radius:8px;display:inline-block}
+.achievement-box{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="nav"><a href="index.html">← Back to Charts</a></div>
+
+<h1>⚔ 2026 Challenge</h1>
+<p class="subtitle">Ranked by total hours studied</p>
+<p class="updated" id="updated"></p>
+<div id="leaderboard"></div>
+</div>
+
+<script>
+const ACHIEVEMENTS = [
+  { min: 500, label: '💎 LEGENDARY! MOST IMPORTANT PERSON ALIVE!', color: '#ff6b6b' },
+  { min: 450, label: '🌟 GALAXIAN KING! UNLOCK A NEW PLANET!', color: '#feca57' },
+  { min: 400, label: '👑 SUPER SAIYAN KING! GOAL ACHIEVED!', color: '#ffd93d' },
+  { min: 350, label: '🎖 DEFENDER! PERSISTENCE PAYS OFF', color: '#6bcb77' },
+  { min: 300, label: '🔥 MASTER! PEAK PRODUCTIVITY!', color: '#ff6b6b' },
+  { min: 250, label: '🏵 GENERAL! TRUE DISCIPLINE!', color: '#4d96ff' },
+  { min: 200, label: '⚔ WARRIOR! SCARS BECOME MEDALS!', color: '#ff9f43' },
+  { min: 150, label: '🌿 OLYMPIAN! MAKING HISTORY!', color: '#1dd1a1' },
+  { min: 100, label: '🥇 CHAMPION! KEEP GOING!', color: '#ffd700' },
+  { min: 50,  label: '🥈 ELITE! WANTED DEAD OR ALIVE!', color: '#c0c0c0' },
+  { min: 25,  label: '🥉 BEST OF YOUR TEAM! YOU ARE DANGEROUS NOW!', color: '#cd7f32' },
+  { min: 1,   label: '✨ TALENT! I BELIEVE IN YOU!', color: '#a29bfe' }
+];
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+function getAchievement(total) {
+  for (const a of ACHIEVEMENTS) {
+    if (total >= a.min) return a;
+  }
+  return { label: '🌱 BEGINNER! EVERY JOURNEY STARTS SMALL!', color: '#636e72' };
+}
+
+function getDaysSince(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now - d) / (1000 * 60 * 60 * 24));
+}
+
+async function init() {
+  try {
+    const res = await fetch('data.json');
+    if (!res.ok) throw new Error('Failed to load data');
+    const json = await res.json();
+
+    document.getElementById('updated').textContent =
+      'Last updated: ' + new Date(json.updatedAt).toLocaleString() +
+      '  ·  Tracking ' + json.labels[0] + ' – ' + json.labels[json.labels.length - 1];
+
+    // Compute totals and rank
+    const ranked = json.users.map(u => {
+      const total = u.daily.reduce((a, b) => a + b, 0);
+      return { ...u, total };
+    }).sort((a, b) => b.total - a.total);
+
+    const container = document.getElementById('leaderboard');
+
+    ranked.forEach((user, i) => {
+      const rank = i + 1;
+      const medal = i < 3 ? MEDALS[i] : '#' + rank;
+      const goalMax = ranked[0].total * 1.15; // 115% of leader's total as max bar width reference
+      const pct = Math.min(100, (user.total / goalMax) * 100);
+      const ach = getAchievement(user.total);
+
+      const card = document.createElement('div');
+      card.className = 'leader-card' + (rank <= 3 ? ' rank-' + rank : '');
+
+      card.innerHTML = `
+        <div class="rank-row">
+          <div class="rank-badge">${medal}</div>
+          <div class="player-info">
+            <div class="player-name" style="color:${['#ffd700','#c0c0c0','#cd7f32'][i] || '#e2e8f0'}">${user.displayName}</div>
+            <div class="player-habit">${user.habitTitle}</div>
+          </div>
+          <div class="total-hours">${user.total.toFixed(1)} <small>h</small></div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar" style="width:${pct}%;background:${ach.color}"></div>
+        </div>
+        <div class="achievement-box">
+          <span class="achievement" style="background:${ach.color}22;color:${ach.color};border:1px solid ${ach.color}44">${ach.label}</span>
+          <span style="font-size:0.85rem;color:#94a3b8">${user.daily.filter(v => v > 0).length} study days</span>
+        </div>
+      `;
+
+      container.appendChild(card);
+    });
+  } catch (err) {
+    document.getElementById('leaderboard').innerHTML = '<div style="text-align:center;padding:2rem;color:#dc2626">Error: ' + err.message + '</div>';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -25,11 +25,11 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 <div id="charts"></div>
 </div>
 <script>
-function renderChart(canvas, data, goals) {
+function renderChart(canvas, labels, data, goals) {
   new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: {
-      labels: data.labels,
+      labels: labels,
       datasets: [
         {
           label: 'Daily Hours',
@@ -42,7 +42,7 @@ function renderChart(canvas, data, goals) {
         },
         {
           label: 'Daily Goal (' + goals.daily + 'h)',
-          data: new Array(data.labels.length).fill(goals.daily),
+          data: new Array(labels.length).fill(goals.daily),
           borderColor: 'black',
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
@@ -60,7 +60,7 @@ function renderChart(canvas, data, goals) {
         },
         {
           label: 'Weekly Goal (' + goals.weekly + 'h)',
-          data: new Array(data.labels.length).fill(goals.weekly),
+          data: new Array(labels.length).fill(goals.weekly),
           borderColor: 'black',
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
@@ -78,7 +78,7 @@ function renderChart(canvas, data, goals) {
         },
         {
           label: 'Monthly Goal (' + goals.monthly + 'h)',
-          data: new Array(data.labels.length).fill(goals.monthly),
+          data: new Array(labels.length).fill(goals.monthly),
           borderColor: 'gold',
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
@@ -137,7 +137,7 @@ async function init() {
       wrapper.appendChild(canvas);
       container.appendChild(wrapper);
 
-      renderChart(canvas, user, json.goals);
+      renderChart(canvas, json.labels, user, json.goals);
     }
   } catch (err) {
     document.getElementById('charts').innerHTML = '<div class="error">' + err.message + '</div>';

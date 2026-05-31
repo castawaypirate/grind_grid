@@ -13,7 +13,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .nav a:hover{color:#fff}
 h1{font-size:1.75rem;font-weight:700;text-align:center}
 .subtitle{text-align:center;color:#94a3b8;margin-bottom:0.5rem;font-size:0.9rem}
-.updated{text-align:center;color:#64748b;margin-bottom:2rem;font-size:0.8rem}
+.updated{text-align:center;color:#64748b;margin-bottom:1rem;font-size:0.8rem}
+.range-picker{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1.5rem;background:#1a1a2e;padding:14px 20px;border-radius:12px;border:1px solid rgba(255,255,255,0.06)}
+.range-picker label{color:#94a3b8;font-size:0.9rem;display:flex;align-items:center;gap:6px}
+.range-picker input[type=date]{background:#0f0f1a;color:#e2e8f0;border:1px solid #333;border-radius:6px;padding:6px 10px;font-size:0.9rem;font-family:inherit}
+.range-picker input[type=date]:focus{outline:none;border-color:#4d96ff}
+.range-picker button{background:#4d96ff;color:white;border:none;border-radius:6px;padding:7px 18px;font-size:0.9rem;cursor:pointer;font-weight:600}
+.range-picker button:hover{background:#3b7de6}
+.range-label{text-align:center;color:#94a3b8;font-size:0.85rem;margin-bottom:1rem}
 .leader-card{background:linear-gradient(135deg,#1e1e2e,#2a2a3e);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
 .leader-card.rank-1{border-color:rgba(255,215,0,0.3);background:linear-gradient(135deg,#1a1a2e,#2a2a1e)}
 .leader-card.rank-2{border-color:rgba(192,192,192,0.2)}
@@ -37,90 +44,152 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 <div class="nav"><a href="index.html">← Back to Charts</a></div>
 
 <h1>⚔ 2026 Challenge</h1>
-<p class="subtitle">Ranked by total hours studied</p>
+<p class="subtitle" id="subtitle">Ranked by total hours studied</p>
 <p class="updated" id="updated"></p>
+
+<div class="range-picker">
+  <label>From <input type="date" id="dateFrom"></label>
+  <span style="color:#555">→</span>
+  <label>To <input type="date" id="dateTo"></label>
+  <button id="updateBtn">Update</button>
+</div>
+
+<div id="rangeLabel" class="range-label"></div>
 <div id="leaderboard"></div>
 </div>
 
 <script>
 const ACHIEVEMENTS = [
-  { min: 500, label: '💎 LEGENDARY! MOST IMPORTANT PERSON ALIVE!', color: '#ff6b6b' },
-  { min: 450, label: '🌟 GALAXIAN KING! UNLOCK A NEW PLANET!', color: '#feca57' },
-  { min: 400, label: '👑 SUPER SAIYAN KING! GOAL ACHIEVED!', color: '#ffd93d' },
-  { min: 350, label: '🎖 DEFENDER! PERSISTENCE PAYS OFF', color: '#6bcb77' },
-  { min: 300, label: '🔥 MASTER! PEAK PRODUCTIVITY!', color: '#ff6b6b' },
-  { min: 250, label: '🏵 GENERAL! TRUE DISCIPLINE!', color: '#4d96ff' },
-  { min: 200, label: '⚔ WARRIOR! SCARS BECOME MEDALS!', color: '#ff9f43' },
-  { min: 150, label: '🌿 OLYMPIAN! MAKING HISTORY!', color: '#1dd1a1' },
-  { min: 100, label: '🥇 CHAMPION! KEEP GOING!', color: '#ffd700' },
-  { min: 50,  label: '🥈 ELITE! WANTED DEAD OR ALIVE!', color: '#c0c0c0' },
-  { min: 25,  label: '🥉 BEST OF YOUR TEAM! YOU ARE DANGEROUS NOW!', color: '#cd7f32' },
-  { min: 1,   label: '✨ TALENT! I BELIEVE IN YOU!', color: '#a29bfe' }
+  { min: 500, label: '💎 LEGENDARY!', color: '#ff6b6b' },
+  { min: 450, label: '🌟 GALAXIAN KING!', color: '#feca57' },
+  { min: 400, label: '👑 SUPER SAIYAN KING!', color: '#ffd93d' },
+  { min: 350, label: '🎖 DEFENDER!', color: '#6bcb77' },
+  { min: 300, label: '🔥 MASTER!', color: '#ff6b6b' },
+  { min: 250, label: '🏵 GENERAL!', color: '#4d96ff' },
+  { min: 200, label: '⚔ WARRIOR!', color: '#ff9f43' },
+  { min: 150, label: '🌿 OLYMPIAN!', color: '#1dd1a1' },
+  { min: 100, label: '🥇 CHAMPION!', color: '#ffd700' },
+  { min: 50,  label: '🥈 ELITE!', color: '#c0c0c0' },
+  { min: 25,  label: '🥉 BEST OF YOUR TEAM!', color: '#cd7f32' },
+  { min: 1,   label: '✨ TALENT!', color: '#a29bfe' }
 ];
 
 const MEDALS = ['🥇', '🥈', '🥉'];
+const DATA_START = new Date('2026-01-01T00:00:00Z');
+const DAY_MS = 86400000;
+
+let jsonData = null;
 
 function getAchievement(total) {
   for (const a of ACHIEVEMENTS) {
     if (total >= a.min) return a;
   }
-  return { label: '🌱 BEGINNER! EVERY JOURNEY STARTS SMALL!', color: '#636e72' };
+  return { label: '🌱 BEGINNER!', color: '#636e72' };
 }
 
-function getDaysSince(dateStr) {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return Math.floor((now - d) / (1000 * 60 * 60 * 24));
+function formatDateShort(d) {
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+function toDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function idxToDate(i) {
+  return new Date(DATA_START.getTime() + i * DAY_MS);
+}
+
+function render(startIdx, endIdx) {
+  const users = jsonData.users;
+  const labels = jsonData.labels;
+
+  const rangeLabel = document.getElementById('rangeLabel');
+  rangeLabel.textContent = formatDateShort(idxToDate(startIdx)) + ' – ' + formatDateShort(idxToDate(endIdx))
+    + ' (' + (endIdx - startIdx + 1) + ' days)';
+
+  const ranked = users.map(u => {
+    const slice = u.daily.slice(startIdx, endIdx + 1);
+    const total = slice.reduce((a, b) => a + b, 0);
+    const studyDays = slice.filter(v => v > 0).length;
+    return { ...u, total, studyDays };
+  }).sort((a, b) => b.total - a.total);
+
+  const container = document.getElementById('leaderboard');
+  container.innerHTML = '';
+
+  ranked.forEach((user, i) => {
+    const rank = i + 1;
+    const medal = i < 3 ? MEDALS[i] : '#' + rank;
+    const goalMax = ranked[0].total * 1.15 || 1;
+    const pct = Math.min(100, (user.total / goalMax) * 100);
+    const ach = getAchievement(user.total);
+
+    const card = document.createElement('div');
+    card.className = 'leader-card' + (rank <= 3 ? ' rank-' + rank : '');
+
+    card.innerHTML = `
+      <div class="rank-row">
+        <div class="rank-badge">${medal}</div>
+        <div class="player-info">
+          <div class="player-name" style="color:${['#ffd700','#c0c0c0','#cd7f32'][i] || '#e2e8f0'}">${user.displayName}</div>
+          <div class="player-habit">${user.habitTitle}</div>
+        </div>
+        <div class="total-hours">${user.total.toFixed(1)} <small>h</small></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar" style="width:${pct}%;background:${ach.color}"></div>
+      </div>
+      <div class="achievement-box">
+        <span class="achievement" style="background:${ach.color}22;color:${ach.color};border:1px solid ${ach.color}44">${ach.label}</span>
+        <span style="font-size:0.85rem;color:#94a3b8">${user.studyDays} study days</span>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+function update() {
+  const dateFrom = new Date(document.getElementById('dateFrom').value + 'T00:00:00Z');
+  const dateTo = new Date(document.getElementById('dateTo').value + 'T00:00:00Z');
+
+  if (isNaN(dateFrom) || isNaN(dateTo)) return;
+
+  let startIdx = Math.max(0, Math.round((dateFrom - DATA_START) / DAY_MS));
+  let endIdx = Math.min(jsonData.labels.length - 1, Math.round((dateTo - DATA_START) / DAY_MS));
+
+  if (startIdx > endIdx) {
+    const tmp = startIdx;
+    startIdx = endIdx;
+    endIdx = tmp;
+  }
+
+  document.getElementById('dateFrom').value = toDateStr(idxToDate(startIdx));
+  document.getElementById('dateTo').value = toDateStr(idxToDate(endIdx));
+
+  render(startIdx, endIdx);
 }
 
 async function init() {
   try {
     const res = await fetch('data.json');
     if (!res.ok) throw new Error('Failed to load data');
-    const json = await res.json();
+    jsonData = await res.json();
+
+    const firstLabel = jsonData.labels[0];
+    const lastLabel = jsonData.labels[jsonData.labels.length - 1];
+    const lastIdx = jsonData.labels.length - 1;
 
     document.getElementById('updated').textContent =
-      'Last updated: ' + new Date(json.updatedAt).toLocaleString() +
-      '  ·  Tracking ' + json.labels[0] + ' – ' + json.labels[json.labels.length - 1];
+      'Last updated: ' + new Date(jsonData.updatedAt).toLocaleString();
 
-    // Compute totals and rank
-    const ranked = json.users.map(u => {
-      const total = u.daily.reduce((a, b) => a + b, 0);
-      return { ...u, total };
-    }).sort((a, b) => b.total - a.total);
+    // Set date inputs
+    document.getElementById('dateFrom').value = '2026-01-01';
+    document.getElementById('dateTo').value = toDateStr(idxToDate(lastIdx));
 
-    const container = document.getElementById('leaderboard');
+    render(0, lastIdx);
 
-    ranked.forEach((user, i) => {
-      const rank = i + 1;
-      const medal = i < 3 ? MEDALS[i] : '#' + rank;
-      const goalMax = ranked[0].total * 1.15; // 115% of leader's total as max bar width reference
-      const pct = Math.min(100, (user.total / goalMax) * 100);
-      const ach = getAchievement(user.total);
-
-      const card = document.createElement('div');
-      card.className = 'leader-card' + (rank <= 3 ? ' rank-' + rank : '');
-
-      card.innerHTML = `
-        <div class="rank-row">
-          <div class="rank-badge">${medal}</div>
-          <div class="player-info">
-            <div class="player-name" style="color:${['#ffd700','#c0c0c0','#cd7f32'][i] || '#e2e8f0'}">${user.displayName}</div>
-            <div class="player-habit">${user.habitTitle}</div>
-          </div>
-          <div class="total-hours">${user.total.toFixed(1)} <small>h</small></div>
-        </div>
-        <div class="progress-wrap">
-          <div class="progress-bar" style="width:${pct}%;background:${ach.color}"></div>
-        </div>
-        <div class="achievement-box">
-          <span class="achievement" style="background:${ach.color}22;color:${ach.color};border:1px solid ${ach.color}44">${ach.label}</span>
-          <span style="font-size:0.85rem;color:#94a3b8">${user.daily.filter(v => v > 0).length} study days</span>
-        </div>
-      `;
-
-      container.appendChild(card);
-    });
+    document.getElementById('updateBtn').addEventListener('click', update);
   } catch (err) {
     document.getElementById('leaderboard').innerHTML = '<div style="text-align:center;padding:2rem;color:#dc2626">Error: ' + err.message + '</div>';
   }

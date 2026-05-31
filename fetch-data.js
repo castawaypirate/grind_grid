@@ -1,3 +1,13 @@
+const USER_AGENT = 'GrindGrid/1.0 (github.com/castawaypirate/grind_grid)';
+const SLEEP_MIN = 0;
+const SLEEP_MAX = 240;
+
+function randomSleep(min, max) {
+  const ms = (Math.random() * (max - min) + min) * 60000;
+  console.log(`Sleeping ${(ms / 60000).toFixed(0)} min before fetch...`);
+  return new Promise(r => setTimeout(r, ms));
+}
+
 const USERS = [
   { username: 'castawaypirate', displayName: 'CastawayPirate' },
   { username: 'barbalias', displayName: 'Barbalias' },
@@ -12,7 +22,7 @@ const GLOBAL_START = new Date('2026-01-01');
 async function fetchUserData(username) {
   const url = 'https://www.lifeofdiscipline.com/api/trpc/profile.getProfilePageForUsername?input='
     + encodeURIComponent(JSON.stringify({ username }));
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${username}`);
   return (await res.json()).result.data;
 }
@@ -66,6 +76,7 @@ function processHabit(username, displayName, habit, globalStart, globalEnd) {
 }
 
 async function main() {
+  await randomSleep(SLEEP_MIN, SLEEP_MAX);
   const rawResults = await Promise.all(USERS.map(async u => {
     try {
       const data = await fetchUserData(u.username);

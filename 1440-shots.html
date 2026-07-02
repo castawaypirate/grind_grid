@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grind Grid — 1440 Shots</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;padding:2rem 1rem}
+.container{max-width:1400px;margin:0 auto}
+.nav{text-align:center;margin-bottom:1.5rem}
+.nav a{color:#64748b;text-decoration:none;font-size:0.9rem}
+.nav a:hover{color:#1e293b}
+h1{font-size:1.75rem;font-weight:700;text-align:center}
+.subtitle{text-align:center;color:#64748b;margin-bottom:0.5rem;font-size:0.9rem}
+.updated{text-align:center;color:#64748b;margin-bottom:1rem;font-size:0.8rem}
+.range-picker{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1.5rem;background:#fff;padding:14px 20px;border-radius:12px;border:1px solid #e2e8f0}
+.range-picker label{color:#64748b;font-size:0.9rem;display:flex;align-items:center;gap:6px}
+.range-picker input[type=date]{background:#fff;color:#1e293b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:0.9rem;font-family:inherit}
+.range-picker input[type=date]:focus{outline:none;border-color:#4d96ff}
+.range-picker button{background:#4d96ff;color:white;border:none;border-radius:6px;padding:7px 18px;font-size:0.9rem;cursor:pointer;font-weight:600}
+.range-picker button:hover{background:#3b7de6}
+.range-label{text-align:center;color:#64748b;font-size:0.85rem;margin-bottom:1rem}
+.chart-wrapper{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1.5rem;margin-bottom:2rem}
+.chart-title{font-size:1.1rem;font-weight:600;margin-bottom:1rem;text-transform:capitalize}
+.chart-wrapper canvas{width:100%!important;height:450px!important}
+.error{text-align:center;padding:2rem;color:#dc2626;background:#fef2f2;border-radius:8px;border:1px solid #fecaca}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="nav"><a href="index.html">← Back to Charts</a></div>
+
+<h1>1440 Shots</h1>
+<p class="subtitle">Every day is 1440 minutes — how do you spend yours?</p>
+<p class="updated" id="updated"></p>
+
+<div class="range-picker">
+  <label>From <input type="date" id="dateFrom"></label>
+  <span style="color:#cbd5e1">→</span>
+  <label>To <input type="date" id="dateTo"></label>
+  <button id="updateBtn">Update</button>
+</div>
+
+<div id="rangeLabel" class="range-label"></div>
+<div id="charts"></div>
+</div>
+
+<script>
+const DATA_START = new Date('2026-01-01T00:00:00Z');
+const DAY_MS = 86400000;
+let jsonData = null;
+
+function toDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function idxToDate(i) {
+  return new Date(DATA_START.getTime() + i * DAY_MS);
+}
+
+function formatDateShort(d) {
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+function renderChart(canvas, labels, dailyHours, goalMins) {
+  const dailyMins = dailyHours.map(h => +(h * 60).toFixed(1));
+  const remainingMins = dailyMins.map(m => 1440 - m);
+  const goalLine = new Array(labels.length).fill(goalMins);
+
+  new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Study',
+          data: dailyMins,
+          borderColor: '#006400',
+          backgroundColor: '#00640033',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        },
+        {
+          label: 'Free',
+          data: remainingMins,
+          borderColor: '#999999',
+          backgroundColor: '#99999933',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        },
+        {
+          label: 'Goal (300 min)',
+          data: goalLine,
+          borderColor: '#000000',
+          borderDash: [5, 5],
+          fill: false,
+          tension: 0,
+          pointRadius: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { boxWidth: 12, font: { size: 11 } } }
+      },
+      scales: {
+        x: {
+          ticks: { maxTicksLimit: 25, font: { size: 10 } }
+        },
+        y: {
+          beginAtZero: true,
+          min: 0,
+          max: 1440,
+          title: { display: true, text: 'Minutes' }
+        }
+      }
+    }
+  });
+}
+
+function render(startIdx, endIdx) {
+  const users = jsonData.users;
+  const labels = jsonData.labels.slice(startIdx, endIdx + 1);
+  const goalMins = jsonData.goals.daily * 60;
+
+  const rangeLabel = document.getElementById('rangeLabel');
+  rangeLabel.textContent = formatDateShort(idxToDate(startIdx)) + ' – ' + formatDateShort(idxToDate(endIdx))
+    + ' (' + (endIdx - startIdx + 1) + ' days)';
+
+  const container = document.getElementById('charts');
+  container.innerHTML = '';
+
+  users.forEach(user => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chart-wrapper';
+
+    const title = document.createElement('div');
+    title.className = 'chart-title';
+    title.textContent = user.displayName + ' \u2014 ' + user.habitTitle;
+    wrapper.appendChild(title);
+
+    const canvas = document.createElement('canvas');
+    wrapper.appendChild(canvas);
+    container.appendChild(wrapper);
+
+    renderChart(canvas, labels, user.daily.slice(startIdx, endIdx + 1), goalMins);
+  });
+}
+
+function update() {
+  const dateFrom = new Date(document.getElementById('dateFrom').value + 'T00:00:00Z');
+  const dateTo = new Date(document.getElementById('dateTo').value + 'T00:00:00Z');
+
+  if (isNaN(dateFrom) || isNaN(dateTo)) return;
+
+  let startIdx = Math.max(0, Math.round((dateFrom - DATA_START) / DAY_MS));
+  let endIdx = Math.min(jsonData.labels.length - 1, Math.round((dateTo - DATA_START) / DAY_MS));
+
+  if (startIdx > endIdx) {
+    const tmp = startIdx;
+    startIdx = endIdx;
+    endIdx = tmp;
+  }
+
+  document.getElementById('dateFrom').value = toDateStr(idxToDate(startIdx));
+  document.getElementById('dateTo').value = toDateStr(idxToDate(endIdx));
+
+  render(startIdx, endIdx);
+}
+
+async function init() {
+  try {
+    const res = await fetch('data.json');
+    if (!res.ok) throw new Error('Failed to load data');
+    jsonData = await res.json();
+
+    const lastIdx = jsonData.labels.length - 1;
+
+    document.getElementById('updated').textContent =
+      'Last updated: ' + new Date(jsonData.updatedAt).toLocaleString();
+
+    document.getElementById('dateFrom').value = '2026-01-01';
+    document.getElementById('dateTo').value = toDateStr(idxToDate(lastIdx));
+
+    render(0, lastIdx);
+
+    document.getElementById('updateBtn').addEventListener('click', update);
+  } catch (err) {
+    document.getElementById('charts').innerHTML = '<div class="error">Error: ' + err.message + '</div>';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

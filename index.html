@@ -43,8 +43,8 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 <div id="charts"></div>
 </div>
 <script>
-const DATA_START = new Date('2026-01-01T00:00:00Z');
 const DAY_MS = 86400000;
+let DATA_START = null;
 let jsonData = null;
 
 function toDateStr(d) {
@@ -211,9 +211,12 @@ async function init() {
     if (!res.ok) throw new Error('Failed to load data.json');
     jsonData = await res.json();
 
+    const dataYear = new Date(jsonData.updatedAt).getUTCFullYear();
+    DATA_START = new Date(Date.UTC(dataYear, 0, 1));
+
     const lastIdx = jsonData.labels.length - 1;
 
-    document.getElementById('dateFrom').value = '2026-01-01';
+    document.getElementById('dateFrom').value = toDateStr(DATA_START);
     document.getElementById('dateTo').value = toDateStr(idxToDate(lastIdx));
 
     render(0, lastIdx);

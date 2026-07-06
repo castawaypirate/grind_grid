@@ -17,7 +17,12 @@ const USERS = [
 
 const GOALS = { daily: 5, weekly: 35, monthly: 150 };
 
-const GLOBAL_START = new Date('2026-01-01');
+function startOfCurrentYearUTC() {
+  const n = new Date();
+  return new Date(Date.UTC(n.getUTCFullYear(), 0, 1));
+}
+
+const GLOBAL_START = startOfCurrentYearUTC();
 
 async function fetchUserData(username) {
   const url = 'https://www.lifeofdiscipline.com/api/trpc/profile.getProfilePageForUsername?input='
@@ -93,11 +98,18 @@ async function main() {
     process.exit(1);
   }
 
+  const now = new Date();
+  const todayCap = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
   let globalEnd = new Date(GLOBAL_START);
   for (const { data } of validResults) {
     const hm = data.habits[0].heatmap || [];
     for (const e of hm) {
       const d = new Date(e.day + 'T00:00:00');
+      if (d > todayCap) {
+        console.error(`Ignoring future-dated heatmap entry ${e.day} (after today ${todayCap.toISOString().slice(0,10)})`);
+        continue;
+      }
       if (d > globalEnd) globalEnd = d;
     }
   }

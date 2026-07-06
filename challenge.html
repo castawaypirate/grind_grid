@@ -43,7 +43,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 <div class="container">
 <div class="nav"><a href="index.html">← Back to Charts</a></div>
 
-<h1>⚔ 2026 Challenge</h1>
+<h1 id="h1Title">⚔ Challenge</h1>
 <p class="subtitle" id="subtitle">Ranked by total hours studied</p>
 <p class="updated" id="updated"></p>
 
@@ -75,8 +75,8 @@ const ACHIEVEMENTS = [
 ];
 
 const MEDALS = ['🥇', '🥈', '🥉'];
-const DATA_START = new Date('2026-01-01T00:00:00Z');
 const DAY_MS = 86400000;
+let DATA_START = null;
 
 let jsonData = null;
 
@@ -176,6 +176,11 @@ async function init() {
     if (!res.ok) throw new Error('Failed to load data');
     jsonData = await res.json();
 
+    const dataYear = new Date(jsonData.updatedAt).getUTCFullYear();
+    DATA_START = new Date(Date.UTC(dataYear, 0, 1));
+
+    document.getElementById('h1Title').textContent = '⚔ ' + dataYear + ' Challenge';
+
     const firstLabel = jsonData.labels[0];
     const lastLabel = jsonData.labels[jsonData.labels.length - 1];
     const lastIdx = jsonData.labels.length - 1;
@@ -183,8 +188,7 @@ async function init() {
     document.getElementById('updated').textContent =
       'Last updated: ' + new Date(jsonData.updatedAt).toLocaleString();
 
-    // Set date inputs
-    document.getElementById('dateFrom').value = '2026-01-01';
+    document.getElementById('dateFrom').value = toDateStr(DATA_START);
     document.getElementById('dateTo').value = toDateStr(idxToDate(lastIdx));
 
     render(0, lastIdx);

@@ -105,7 +105,7 @@ async function main() {
   for (const { data } of validResults) {
     const hm = data.habits[0].heatmap || [];
     for (const e of hm) {
-      const d = new Date(e.day + 'T00:00:00');
+      const d = new Date(e.day + 'T00:00:00Z');
       if (d > todayCap) {
         console.error(`Ignoring future-dated heatmap entry ${e.day} (after today ${todayCap.toISOString().slice(0,10)})`);
         continue;

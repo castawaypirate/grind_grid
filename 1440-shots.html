@@ -127,6 +127,9 @@ function renderChart(canvas, labels, dailyHours, goalMins) {
         tooltip: {
           mode: 'index',
           intersect: false,
+          titleFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
+          bodyFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
+          footerFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
           callbacks: {
             label: function(ctx) {
               return ctx.dataset.label + ': ' + formatDuration(ctx.parsed.y);

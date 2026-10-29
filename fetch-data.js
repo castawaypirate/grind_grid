@@ -22,8 +22,6 @@ function startOfCurrentYearUTC() {
   return new Date(Date.UTC(n.getUTCFullYear(), 0, 1));
 }
 
-const GLOBAL_START = startOfCurrentYearUTC();
-
 async function fetchUserData(username) {
   const url = 'https://www.lifeofdiscipline.com/api/trpc/profile.getProfilePageForUsername?input='
     + encodeURIComponent(JSON.stringify({ username }));
@@ -33,7 +31,7 @@ async function fetchUserData(username) {
 }
 
 function getISOWeekKey(dt) {
-  const d = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+  const d = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   const ys = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const wn = Math.ceil((((d - ys) / 86400000) + 1) / 7);
@@ -52,7 +50,7 @@ function processHabit(username, displayName, habit, globalStart, globalEnd) {
   while (cur <= globalEnd) {
     const key = cur.toISOString().slice(0, 10);
     filled.push({ date: new Date(cur), hours: map[key] || 0 });
-    cur.setDate(cur.getDate() + 1);
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
 
   const daily = filled.map(f => +f.hours.toFixed(2));
@@ -62,7 +60,7 @@ function processHabit(username, displayName, habit, globalStart, globalEnd) {
     const wk = getISOWeekKey(f.date);
     if (!wStats[wk]) wStats[wk] = { hours: 0 };
     wStats[wk].hours += f.hours;
-    const mk = f.date.getFullYear() + '-' + String(f.date.getMonth() + 1).padStart(2, '0');
+    const mk = f.date.getUTCFullYear() + '-' + String(f.date.getUTCMonth() + 1).padStart(2, '0');
     if (!mStats[mk]) mStats[mk] = { hours: 0 };
     mStats[mk].hours += f.hours;
   }
@@ -73,7 +71,7 @@ function processHabit(username, displayName, habit, globalStart, globalEnd) {
   });
 
   const monthlyLine = filled.map(f => {
-    const mk = f.date.getFullYear() + '-' + String(f.date.getMonth() + 1).padStart(2, '0');
+    const mk = f.date.getUTCFullYear() + '-' + String(f.date.getUTCMonth() + 1).padStart(2, '0');
     return +(mStats[mk]?.hours || 0).toFixed(2);
   });
 
@@ -101,7 +99,8 @@ async function main() {
   const now = new Date();
   const todayCap = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-  let globalEnd = new Date(GLOBAL_START);
+  let globalStart = null;
+  let globalEnd = null;
   for (const { data } of validResults) {
     const hm = data.habits[0].heatmap || [];
     for (const e of hm) {
@@ -110,20 +109,24 @@ async function main() {
         console.error(`Ignoring future-dated heatmap entry ${e.day} (after today ${todayCap.toISOString().slice(0,10)})`);
         continue;
       }
-      if (d > globalEnd) globalEnd = d;
+      if (!globalStart || d < globalStart) globalStart = d;
+      if (!globalEnd || d > globalEnd) globalEnd = d;
     }
   }
 
+  if (!globalStart) globalStart = startOfCurrentYearUTC();
+  if (!globalEnd || globalEnd < globalStart) globalEnd = new Date(globalStart);
+
   const labels = [];
-  const cur = new Date(GLOBAL_START);
+  const cur = new Date(globalStart);
   while (cur <= globalEnd) {
-    labels.push(cur.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }));
-    cur.setDate(cur.getDate() + 1);
+    labels.push(cur.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }));
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
 
   const users = [];
   for (const u of validResults) {
-    const result = processHabit(u.username, u.displayName, u.data.habits[0], GLOBAL_START, globalEnd);
+    const result = processHabit(u.username, u.displayName, u.data.habits[0], globalStart, globalEnd);
     if (result) users.push(result);
   }
 
@@ -133,7 +136,14 @@ async function main() {
   }
 
   const fs = require('fs');
-  fs.writeFileSync('data.json', JSON.stringify({ updatedAt: new Date().toISOString(), labels, goals: GOALS, users }, null, 2));
+  fs.writeFileSync('data.json', JSON.stringify({
+    updatedAt: new Date().toISOString(),
+    startDate: globalStart.toISOString().slice(0, 10),
+    endDate: globalEnd.toISOString().slice(0, 10),
+    labels,
+    goals: GOALS,
+    users
+  }, null, 2));
   console.log('Wrote data.json with ' + users.length + ' user(s)');
 }
 

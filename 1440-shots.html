@@ -49,20 +49,54 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 </div>
 
 <script>
-const DATA_START = new Date('2026-01-01T00:00:00Z');
 const DAY_MS = 86400000;
+const STORAGE_KEY = 'grindgrid.dateRange';
+let DATA_START = null;
 let jsonData = null;
 
 function toDateStr(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
 }
 
 function idxToDate(i) {
   return new Date(DATA_START.getTime() + i * DAY_MS);
 }
 
-function formatDateShort(d) {
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+function formatChartLabel(d) {
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function formatRangeLabel(start, end) {
+  const startText = formatChartLabel(start);
+  const endText = formatChartLabel(end);
+  if (start.getUTCFullYear() === end.getUTCFullYear()) {
+    return startText.replace(/ \d{4}$/, '') + ' – ' + endText;
+  }
+  return startText + ' – ' + endText;
+}
+
+function sliceWithPadding(arr, startIdx, endIdx) {
+  const out = [];
+  for (let i = startIdx; i <= endIdx; i++) {
+    out.push(i >= 0 && i < arr.length ? arr[i] : 0);
+  }
+  return out;
+}
+
+function loadSavedRange() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved.from) && /^\d{4}-\d{2}-\d{2}$/.test(saved.to)) {
+      return saved;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function saveRange(from, to) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ from, to }));
+  } catch (e) {}
 }
 
 function formatDuration(mins) {
@@ -127,6 +161,9 @@ function renderChart(canvas, labels, dailyHours, goalMins) {
         tooltip: {
           mode: 'index',
           intersect: false,
+          titleFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
+          bodyFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
+          footerFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
           callbacks: {
             label: function(ctx) {
               return ctx.dataset.label + ': ' + formatDuration(ctx.parsed.y);
@@ -151,11 +188,14 @@ function renderChart(canvas, labels, dailyHours, goalMins) {
 
 function render(startIdx, endIdx) {
   const users = jsonData.users;
-  const labels = jsonData.labels.slice(startIdx, endIdx + 1);
   const goalMins = jsonData.goals.daily * 60;
+  const labels = [];
+  for (let i = startIdx; i <= endIdx; i++) {
+    labels.push(formatChartLabel(idxToDate(i)));
+  }
 
   const rangeLabel = document.getElementById('rangeLabel');
-  rangeLabel.textContent = formatDateShort(idxToDate(startIdx)) + ' – ' + formatDateShort(idxToDate(endIdx))
+  rangeLabel.textContent = formatRangeLabel(idxToDate(startIdx), idxToDate(endIdx))
     + ' (' + (endIdx - startIdx + 1) + ' days)';
 
   const container = document.getElementById('charts');
@@ -174,7 +214,7 @@ function render(startIdx, endIdx) {
     wrapper.appendChild(canvas);
     container.appendChild(wrapper);
 
-    renderChart(canvas, labels, user.daily.slice(startIdx, endIdx + 1), goalMins);
+    renderChart(canvas, labels, sliceWithPadding(user.daily, startIdx, endIdx), goalMins);
   });
 }
 
@@ -184,8 +224,8 @@ function update() {
 
   if (isNaN(dateFrom) || isNaN(dateTo)) return;
 
-  let startIdx = Math.max(0, Math.round((dateFrom - DATA_START) / DAY_MS));
-  let endIdx = Math.min(jsonData.labels.length - 1, Math.round((dateTo - DATA_START) / DAY_MS));
+  let startIdx = Math.round((dateFrom - DATA_START) / DAY_MS);
+  let endIdx = Math.round((dateTo - DATA_START) / DAY_MS);
 
   if (startIdx > endIdx) {
     const tmp = startIdx;
@@ -193,8 +233,15 @@ function update() {
     endIdx = tmp;
   }
 
-  document.getElementById('dateFrom').value = toDateStr(idxToDate(startIdx));
-  document.getElementById('dateTo').value = toDateStr(idxToDate(endIdx));
+  // Future dates still stop at the latest available data point.
+  endIdx = Math.min(endIdx, jsonData.labels.length - 1);
+  startIdx = Math.min(startIdx, endIdx);
+
+  const from = toDateStr(idxToDate(startIdx));
+  const to = toDateStr(idxToDate(endIdx));
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value = to;
+  saveRange(from, to);
 
   render(startIdx, endIdx);
 }
@@ -205,15 +252,24 @@ async function init() {
     if (!res.ok) throw new Error('Failed to load data');
     jsonData = await res.json();
 
+    if (!jsonData.startDate) throw new Error('data.json is missing startDate');
+    DATA_START = new Date(jsonData.startDate + 'T00:00:00Z');
+
     const lastIdx = jsonData.labels.length - 1;
+    const fromInput = document.getElementById('dateFrom');
+    const toInput = document.getElementById('dateTo');
+
+    fromInput.max = toDateStr(idxToDate(lastIdx));
+    toInput.max = toDateStr(idxToDate(lastIdx));
 
     document.getElementById('updated').textContent =
       'Last updated: ' + new Date(jsonData.updatedAt).toLocaleString();
 
-    document.getElementById('dateFrom').value = '2026-01-01';
-    document.getElementById('dateTo').value = toDateStr(idxToDate(lastIdx));
+    const saved = loadSavedRange();
+    fromInput.value = saved ? saved.from : toDateStr(DATA_START);
+    toInput.value = saved ? saved.to : toDateStr(idxToDate(lastIdx));
 
-    render(0, lastIdx);
+    update();
 
     document.getElementById('updateBtn').addEventListener('click', update);
   } catch (err) {

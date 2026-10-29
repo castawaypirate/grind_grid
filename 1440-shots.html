@@ -26,11 +26,11 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .chart-wrapper{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1.5rem;margin-bottom:2rem}
 .chart-title{font-size:1.1rem;font-weight:600;margin-bottom:1rem;text-transform:capitalize}
 .chart-wrapper canvas{width:100%!important;height:450px!important}
-.chart-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-bottom:12px}
-.chart-legend label{display:inline-flex;align-items:center;gap:7px;padding:3px 7px;border-radius:6px;font-size:12px;color:#475569;cursor:pointer;user-select:none;transition:opacity .15s,background .15s}
+.chart-legend{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 8px;margin-bottom:12px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+.chart-legend label{display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border-radius:6px;font-size:11px;color:#475569;cursor:pointer;user-select:none;white-space:nowrap;transition:opacity .15s,background .15s}
 .chart-legend label:hover{background:#f1f5f9}
-.chart-legend input{width:14px;height:14px;margin:0;cursor:pointer}
-.chart-legend .legend-line{width:22px;height:0;flex:none;border-top:2px solid currentColor}
+.chart-legend input{width:13px;height:13px;margin:0;cursor:pointer}
+.chart-legend .legend-line{width:18px;height:0;flex:none;border-top:2px solid currentColor}
 .chart-legend .legend-line.dashed{border-top-style:dashed}
 .chart-legend label.off{opacity:.4}
 .chart-legend label.off .legend-text{text-decoration:line-through}

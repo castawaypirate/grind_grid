@@ -59,6 +59,15 @@ function formatDateShort(d) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
+function formatDuration(mins) {
+  const total = Math.round(mins);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return m + ' min';
+  if (m === 0) return h + 'h';
+  return h + 'h ' + m + ' min';
+}
+
 function renderChart(canvas, labels, data, goals) {
   new Chart(canvas.getContext('2d'), {
     type: 'line',
@@ -130,7 +139,7 @@ function renderChart(canvas, labels, data, goals) {
           intersect: false,
           callbacks: {
             label: function(ctx) {
-              return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + ' h';
+              return ctx.dataset.label + ': ' + formatDuration(ctx.parsed.y * 60);
             }
           }
         },

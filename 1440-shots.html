@@ -65,6 +65,15 @@ function formatDateShort(d) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
+function formatDuration(mins) {
+  const total = Math.round(mins);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return m + ' min';
+  if (m === 0) return h + 'h';
+  return h + 'h ' + m + ' min';
+}
+
 function renderChart(canvas, labels, dailyHours, goalMins) {
   const dailyMins = dailyHours.map(h => +(h * 60).toFixed(1));
   const remainingMins = dailyMins.map(m => 1440 - m);
@@ -96,7 +105,7 @@ function renderChart(canvas, labels, dailyHours, goalMins) {
           pointHoverRadius: 6
         },
         {
-          label: 'Goal (300 min)',
+          label: 'Goal (' + formatDuration(goalMins) + ')',
           data: goalLine,
           borderColor: '#000000',
           borderDash: [5, 5],
@@ -120,9 +129,7 @@ function renderChart(canvas, labels, dailyHours, goalMins) {
           intersect: false,
           callbacks: {
             label: function(ctx) {
-              const min = ctx.parsed.y;
-              const hrs = (min / 60).toFixed(2);
-              return ctx.dataset.label + ': ' + min.toFixed(0) + ' min (' + hrs + ' h)';
+              return ctx.dataset.label + ': ' + formatDuration(ctx.parsed.y);
             }
           }
         }

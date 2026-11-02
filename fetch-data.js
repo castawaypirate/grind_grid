@@ -117,6 +117,11 @@ async function main() {
   if (!globalStart) globalStart = startOfCurrentYearUTC();
   if (!globalEnd || globalEnd < globalStart) globalEnd = new Date(globalStart);
 
+  // If we haven't seen today's date in heatmaps, extend to today with zero-filled data
+  if (globalEnd < todayCap) {
+    globalEnd = todayCap;
+  }
+
   const labels = [];
   const cur = new Date(globalStart);
   while (cur <= globalEnd) {

@@ -1,6 +1,7 @@
 const USER_AGENT = 'GrindGrid/1.0 (github.com/castawaypirate/grind_grid)';
 const SLEEP_MIN = 0;
 const SLEEP_MAX = 240;
+const RETRY_DELAY_MS = 30000;
 
 function randomSleep(min, max) {
   const ms = (Math.random() * (max - min) + min) * 60000;
@@ -27,7 +28,19 @@ async function fetchUserData(username) {
     + encodeURIComponent(JSON.stringify({ username }));
   const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${username}`);
-  return (await res.json()).result.data;
+  const data = (await res.json()).result.data;
+  if (!data.habits?.length) throw new Error(`No habits for ${username}`);
+  return data;
+}
+
+async function fetchUserDataWithRetry(username) {
+  try {
+    return await fetchUserData(username);
+  } catch (err) {
+    console.error(`Retrying ${username} after error: ${err.message}`);
+    await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+    return fetchUserData(username);
+  }
 }
 
 function getISOWeekKey(dt) {
@@ -79,10 +92,10 @@ function processHabit(username, displayName, habit, globalStart, globalEnd) {
 }
 
 async function main() {
-  await randomSleep(SLEEP_MIN, SLEEP_MAX);
+  if (process.env.SKIP_SLEEP !== 'true') await randomSleep(SLEEP_MIN, SLEEP_MAX);
   const rawResults = await Promise.all(USERS.map(async u => {
     try {
-      const data = await fetchUserData(u.username);
+      const data = await fetchUserDataWithRetry(u.username);
       return { ...u, data };
     } catch (err) {
       console.error('Failed to fetch ' + u.username + ': ' + err.message);
@@ -90,9 +103,10 @@ async function main() {
     }
   }));
 
+  // Keep the last complete data.json rather than publish one with users missing.
   const validResults = rawResults.filter(Boolean);
-  if (validResults.length === 0) {
-    console.error('No data fetched for any user');
+  if (validResults.length !== USERS.length) {
+    console.error(`Fetched ${validResults.length} of ${USERS.length} users; leaving data.json unchanged`);
     process.exit(1);
   }
 
@@ -129,16 +143,9 @@ async function main() {
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
 
-  const users = [];
-  for (const u of validResults) {
-    const result = processHabit(u.username, u.displayName, u.data.habits[0], globalStart, globalEnd);
-    if (result) users.push(result);
-  }
-
-  if (users.length === 0) {
-    console.error('No data processed for any user');
-    process.exit(1);
-  }
+  const users = validResults.map(u =>
+    processHabit(u.username, u.displayName, u.data.habits[0], globalStart, globalEnd)
+  );
 
   const fs = require('fs');
   fs.writeFileSync('data.json', JSON.stringify({

@@ -37,6 +37,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .progress-bar{height:100%;border-radius:8px;transition:width 0.6s}
 .achievement{margin-top:10px;font-size:0.9rem;padding:6px 12px;border-radius:8px;display:inline-block}
 .achievement-box{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:8px}
+.error{text-align:center;padding:2rem;color:#dc2626}
 </style>
 </head>
 <body>
@@ -51,13 +52,15 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
   <label>From <input type="date" id="dateFrom"></label>
   <span style="color:#555">→</span>
   <label>To <input type="date" id="dateTo"></label>
-  <button id="updateBtn">Update</button>
+  <button id="applyBtn">Apply</button>
+  <button id="latestBtn">Latest</button>
 </div>
 
 <div id="rangeLabel" class="range-label"></div>
 <div id="leaderboard"></div>
 </div>
 
+<script src="common.js"></script>
 <script>
 const ACHIEVEMENTS = [
   { min: 500, label: '💎 LEGENDARY!', color: '#ff6b6b' },
@@ -75,62 +78,12 @@ const ACHIEVEMENTS = [
 ];
 
 const MEDALS = ['🥇', '🥈', '🥉'];
-const DAY_MS = 86400000;
-const STORAGE_KEY = 'grindgrid.dateRange';
-let DATA_START = null;
-
-let jsonData = null;
 
 function getAchievement(total) {
   for (const a of ACHIEVEMENTS) {
     if (total >= a.min) return a;
   }
   return { label: '🌱 BEGINNER!', color: '#636e72' };
-}
-
-function formatChartLabel(d) {
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
-}
-
-function formatRangeLabel(start, end) {
-  const startText = formatChartLabel(start);
-  const endText = formatChartLabel(end);
-  if (start.getUTCFullYear() === end.getUTCFullYear()) {
-    return startText.replace(/ \d{4}$/, '') + ' – ' + endText;
-  }
-  return startText + ' – ' + endText;
-}
-
-function toDateStr(d) {
-  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
-}
-
-function idxToDate(i) {
-  return new Date(DATA_START.getTime() + i * DAY_MS);
-}
-
-function sliceWithPadding(arr, startIdx, endIdx) {
-  const out = [];
-  for (let i = startIdx; i <= endIdx; i++) {
-    out.push(i >= 0 && i < arr.length ? arr[i] : 0);
-  }
-  return out;
-}
-
-function loadSavedRange() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved.from) && /^\d{4}-\d{2}-\d{2}$/.test(saved.to)) {
-      return saved;
-    }
-  } catch (e) {}
-  return null;
-}
-
-function saveRange(from, to) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ from, to }));
-  } catch (e) {}
 }
 
 function render(startIdx, endIdx) {
@@ -164,8 +117,8 @@ function render(startIdx, endIdx) {
       <div class="rank-row">
         <div class="rank-badge">${medal}</div>
         <div class="player-info">
-          <div class="player-name" style="color:${['#ffd700','#c0c0c0','#cd7f32'][i] || '#e2e8f0'}">${user.displayName}</div>
-          <div class="player-habit">${user.habitTitle}</div>
+          <div class="player-name" style="color:${['#ffd700','#c0c0c0','#cd7f32'][i] || '#e2e8f0'}"></div>
+          <div class="player-habit"></div>
         </div>
         <div class="total-hours">${user.total.toFixed(1)} <small>h</small></div>
       </div>
@@ -177,76 +130,25 @@ function render(startIdx, endIdx) {
         <span style="font-size:0.85rem;color:#94a3b8">${user.studyDays} study days</span>
       </div>
     `;
+    card.querySelector('.player-name').textContent = user.displayName;
+    card.querySelector('.player-habit').textContent = user.habitTitle;
 
     container.appendChild(card);
   });
 }
 
-function update() {
-  const dateFrom = new Date(document.getElementById('dateFrom').value + 'T00:00:00Z');
-  const dateTo = new Date(document.getElementById('dateTo').value + 'T00:00:00Z');
-
-  if (isNaN(dateFrom) || isNaN(dateTo)) return;
-
-  let startIdx = Math.round((dateFrom - DATA_START) / DAY_MS);
-  let endIdx = Math.round((dateTo - DATA_START) / DAY_MS);
-
-  if (startIdx > endIdx) {
-    const tmp = startIdx;
-    startIdx = endIdx;
-    endIdx = tmp;
-  }
-
-  // Future dates still stop at the latest available data point.
-  endIdx = Math.min(endIdx, jsonData.labels.length - 1);
-  startIdx = Math.min(startIdx, endIdx);
-
-  const from = toDateStr(idxToDate(startIdx));
-  const to = toDateStr(idxToDate(endIdx));
-  document.getElementById('dateFrom').value = from;
-  document.getElementById('dateTo').value = to;
-  saveRange(from, to);
-
-  render(startIdx, endIdx);
+function setChallengeTitle(lastIdx) {
+  const startYear = DATA_START.getUTCFullYear();
+  const endYear = idxToDate(lastIdx).getUTCFullYear();
+  document.getElementById('h1Title').textContent = '⚔ ' +
+    (startYear === endYear ? startYear : startYear + '–' + endYear) + ' Challenge';
 }
 
-async function init() {
-  try {
-    const res = await fetch('data.json');
-    if (!res.ok) throw new Error('Failed to load data');
-    jsonData = await res.json();
-
-    if (!jsonData.startDate) throw new Error('data.json is missing startDate');
-    DATA_START = new Date(jsonData.startDate + 'T00:00:00Z');
-
-    const lastIdx = jsonData.labels.length - 1;
-    const startYear = DATA_START.getUTCFullYear();
-    const endYear = idxToDate(lastIdx).getUTCFullYear();
-    document.getElementById('h1Title').textContent = '⚔ ' +
-      (startYear === endYear ? startYear : startYear + '–' + endYear) + ' Challenge';
-
-    const fromInput = document.getElementById('dateFrom');
-    const toInput = document.getElementById('dateTo');
-
-    fromInput.max = toDateStr(idxToDate(lastIdx));
-    toInput.max = toDateStr(idxToDate(lastIdx));
-
-    document.getElementById('updated').textContent =
-      'Last updated: ' + new Date(jsonData.updatedAt).toLocaleString();
-
-    const saved = loadSavedRange();
-    fromInput.value = saved ? saved.from : toDateStr(DATA_START);
-    toInput.value = saved ? saved.to : toDateStr(idxToDate(lastIdx));
-
-    update();
-
-    document.getElementById('updateBtn').addEventListener('click', update);
-  } catch (err) {
-    document.getElementById('leaderboard').innerHTML = '<div style="text-align:center;padding:2rem;color:#dc2626">Error: ' + err.message + '</div>';
-  }
-}
-
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => initRangePage({
+  render,
+  errorEl: document.getElementById('leaderboard'),
+  onData: setChallengeTitle
+}));
 </script>
 </body>
 </html>

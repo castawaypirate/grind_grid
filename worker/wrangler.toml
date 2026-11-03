@@ -1,0 +1,3 @@
+name = "grind-grid-notes"
+main = "notes-worker.js"
+compatibility_date = "2026-11-01"

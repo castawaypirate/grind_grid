@@ -1,2 +1,4 @@
 snapshot.md
 docs/
+worker/.wrangler/
+worker/.dev.vars

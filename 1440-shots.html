@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grind Grid — 1440 Shots</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="notes.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;padding:2rem 1rem}
@@ -51,6 +52,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
   <label>To <input type="date" id="dateTo"></label>
   <button id="applyBtn">Apply</button>
   <button id="latestBtn">Latest</button>
+  <label><input type="checkbox" id="notesToggle"> Notes</label>
 </div>
 
 <div id="rangeLabel" class="range-label"></div>
@@ -58,8 +60,9 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 </div>
 
 <script src="common.js"></script>
+<script src="notes.js"></script>
 <script>
-function renderChart(canvas, labels, dailyHours, goalMins, legendEl) {
+function renderChart(canvas, labels, dailyHours, goalMins, legendEl, user, startIdx) {
   const dailyMins = dailyHours.map(h => +(h * 60).toFixed(1));
   const remainingMins = dailyMins.map(m => 1440 - m);
   const goalLine = new Array(labels.length).fill(goalMins);
@@ -76,8 +79,7 @@ function renderChart(canvas, labels, dailyHours, goalMins, legendEl) {
           backgroundColor: '#00640033',
           fill: true,
           tension: 0.3,
-          pointRadius: 4,
-          pointHoverRadius: 6
+          ...noteDotOptions(user.username, startIdx, 4, 6, '#00640033')
         },
         {
           label: 'Free',
@@ -137,6 +139,7 @@ function renderChart(canvas, labels, dailyHours, goalMins, legendEl) {
   });
 
   activeCharts.push(chart);
+  attachNotes(chart, canvas, user, startIdx);
   renderLegend(chart, legendEl);
 }
 
@@ -173,14 +176,14 @@ function render(startIdx, endIdx) {
     wrapper.appendChild(canvas);
     container.appendChild(wrapper);
 
-    renderChart(canvas, labels, sliceWithPadding(user.daily, startIdx, endIdx), goalMins, legend);
+    renderChart(canvas, labels, sliceWithPadding(user.daily, startIdx, endIdx), goalMins, legend, user, startIdx);
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => initRangePage({
-  render,
-  errorEl: document.getElementById('charts')
-}));
+document.addEventListener('DOMContentLoaded', () => {
+  initNotes();
+  initRangePage({ render, errorEl: document.getElementById('charts') });
+});
 </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// Shared by index.html, challenge.html, 1440-shots.html and calendar.html.
+// Shared by index.html, challenge.html, 1440-shots.html and calendar.html. Needs theme.js.
 const DAY_MS = 86400000;
 const STORAGE_KEY = 'grindgrid.dateRange.v2';
 // The worker that saves notes and meetings (worker/notes-worker.js).
@@ -116,6 +116,17 @@ function formatDuration(mins) {
   return h + 'h ' + m + ' min';
 }
 
+// Reads a color token from theme.css for the current theme.
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function applyChartTheme() {
+  if (typeof Chart === 'undefined') return;
+  Chart.defaults.color = cssVar('--chart-text');
+  Chart.defaults.borderColor = cssVar('--chart-grid');
+}
+
 function destroyCharts() {
   activeCharts.forEach(chart => chart.destroy());
   activeCharts.length = 0;
@@ -173,6 +184,18 @@ function showError(errorEl, err) {
 async function initRangePage({ render, errorEl, onData }) {
   const fromInput = document.getElementById('dateFrom');
   const toInput = document.getElementById('dateTo');
+  let shownRange = null;
+
+  function draw(startIdx, endIdx) {
+    shownRange = [startIdx, endIdx];
+    applyChartTheme();
+    render(startIdx, endIdx);
+  }
+
+  // Charts take their colors when they are drawn, so draw them again in the new theme.
+  onThemeChange(() => {
+    if (shownRange) draw(...shownRange);
+  });
 
   function applyRange({ save }) {
     const dateFrom = new Date(fromInput.value + 'T00:00:00Z');
@@ -199,7 +222,7 @@ async function initRangePage({ render, errorEl, onData }) {
     // Only an explicit click saves, so visitors who never choose a range keep following new data.
     if (save) saveRange(fromInput.value, toInput.value);
 
-    render(startIdx, endIdx);
+    draw(startIdx, endIdx);
   }
 
   try {

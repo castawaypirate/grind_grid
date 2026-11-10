@@ -4,40 +4,50 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grind Grid — Challenge</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
 <style>
+:root{--card-from:#fff;--card-to:#fff;--card-shadow:0 2px 10px rgba(15,23,42,.06);--rank1-from:#fffbeb;--rank1-to:#fff;--rank1-border:rgba(214,158,46,0.5);--rank2-border:rgba(148,163,184,0.6);--rank3-border:rgba(205,127,50,0.45);--gold:#b7791f;--silver:#64748b;--bronze:#a0522d;--track:#e2e8f0}
+:root[data-theme="dark"]{--card-from:#1e1e2e;--card-to:#2a2a3e;--card-shadow:0 4px 20px rgba(0,0,0,0.3);--rank1-from:#1a1a2e;--rank1-to:#2a2a1e;--rank1-border:rgba(255,215,0,0.3);--rank2-border:rgba(192,192,192,0.2);--rank3-border:rgba(205,127,50,0.2);--gold:#ffd700;--silver:#c0c0c0;--bronze:#cd7f32;--track:#333}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f1a;color:#e2e8f0;padding:2rem 1rem}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:2rem 1rem}
 .container{max-width:900px;margin:0 auto}
 .nav{text-align:center;margin-bottom:1.5rem}
-.nav a{color:#94a3b8;text-decoration:none;font-size:0.9rem}
-.nav a:hover{color:#fff}
+.nav a{color:var(--muted);text-decoration:none;font-size:0.9rem}
+.nav a:hover{color:var(--text)}
 h1{font-size:1.75rem;font-weight:700;text-align:center}
-.subtitle{text-align:center;color:#94a3b8;margin-bottom:0.5rem;font-size:0.9rem}
-.updated{text-align:center;color:#64748b;margin-bottom:1rem;font-size:0.8rem}
-.range-picker{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1.5rem;background:#1a1a2e;padding:14px 20px;border-radius:12px;border:1px solid rgba(255,255,255,0.06)}
-.range-picker label{color:#94a3b8;font-size:0.9rem;display:flex;align-items:center;gap:6px}
-.range-picker input[type=date]{background:#0f0f1a;color:#e2e8f0;border:1px solid #333;border-radius:6px;padding:6px 10px;font-size:0.9rem;font-family:inherit}
-.range-picker input[type=date]:focus{outline:none;border-color:#4d96ff}
-.range-picker button{background:#4d96ff;color:white;border:none;border-radius:6px;padding:7px 18px;font-size:0.9rem;cursor:pointer;font-weight:600}
-.range-picker button:hover{background:#3b7de6}
-.range-label{text-align:center;color:#94a3b8;font-size:0.85rem;margin-bottom:1rem}
-.leader-card{background:linear-gradient(135deg,#1e1e2e,#2a2a3e);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
-.leader-card.rank-1{border-color:rgba(255,215,0,0.3);background:linear-gradient(135deg,#1a1a2e,#2a2a1e)}
-.leader-card.rank-2{border-color:rgba(192,192,192,0.2)}
-.leader-card.rank-3{border-color:rgba(205,127,50,0.2)}
+.subtitle{text-align:center;color:var(--muted);margin-bottom:0.5rem;font-size:0.9rem}
+.updated{text-align:center;color:var(--muted);margin-bottom:1rem;font-size:0.8rem}
+.range-picker{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1.5rem;background:var(--surface);padding:14px 20px;border-radius:12px;border:1px solid var(--border)}
+.range-picker label{color:var(--muted);font-size:0.9rem;display:flex;align-items:center;gap:6px}
+.range-picker input[type=date]{background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.9rem;font-family:inherit}
+.range-picker input[type=date]:focus{outline:none;border-color:var(--accent)}
+.range-picker button{background:var(--accent);color:white;border:none;border-radius:6px;padding:7px 18px;font-size:0.9rem;cursor:pointer;font-weight:600}
+.range-picker button:hover{background:var(--accent-hover)}
+.range-label{text-align:center;color:var(--muted);font-size:0.85rem;margin-bottom:1rem}
+.leader-card{background:linear-gradient(135deg,var(--card-from),var(--card-to));border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:var(--card-shadow)}
+.leader-card.rank-1{border-color:var(--rank1-border);background:linear-gradient(135deg,var(--rank1-from),var(--rank1-to))}
+.leader-card.rank-2{border-color:var(--rank2-border)}
+.leader-card.rank-3{border-color:var(--rank3-border)}
 .rank-row{display:flex;align-items:center;gap:14px}
 .rank-badge{font-size:1.6rem;width:44px;text-align:center}
 .rank-1 .rank-badge{font-size:2rem}
 .player-info{flex:1}
 .player-name{font-size:1.2rem;font-weight:600}
-.player-habit{font-size:0.8rem;color:#94a3b8;margin-top:2px}
+.rank-1 .player-name{color:var(--gold)}
+.rank-2 .player-name{color:var(--silver)}
+.rank-3 .player-name{color:var(--bronze)}
+.player-habit{font-size:0.8rem;color:var(--muted);margin-top:2px}
 .total-hours{font-size:1.8rem;font-weight:700;text-align:right;min-width:120px}
-.total-hours small{font-size:0.8rem;font-weight:400;color:#94a3b8}
-.progress-wrap{background:#333;height:10px;border-radius:8px;overflow:hidden;margin-top:8px}
+.total-hours small{font-size:0.8rem;font-weight:400;color:var(--muted)}
+.progress-wrap{background:var(--track);height:10px;border-radius:8px;overflow:hidden;margin-top:8px}
 .progress-bar{height:100%;border-radius:8px;transition:width 0.6s}
-.achievement{margin-top:10px;font-size:0.9rem;padding:6px 12px;border-radius:8px;display:inline-block}
+.achievement{margin-top:10px;font-size:0.9rem;padding:6px 12px;border-radius:8px;display:inline-block;color:var(--ach);background:color-mix(in srgb,var(--ach) 13%,transparent);border:1px solid color-mix(in srgb,var(--ach) 27%,transparent)}
+:root[data-theme="light"] .achievement{color:color-mix(in srgb,var(--ach) 55%,#000);background:color-mix(in srgb,var(--ach) 18%,transparent);border-color:color-mix(in srgb,var(--ach) 50%,transparent)}
+.study-days{font-size:0.85rem;color:var(--muted)}
 .achievement-box{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:8px}
-.error{text-align:center;padding:2rem;color:#dc2626}
+.error{text-align:center;padding:2rem;color:var(--error-text)}
 </style>
 </head>
 <body>
@@ -50,7 +60,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 
 <div class="range-picker">
   <label>From <input type="date" id="dateFrom"></label>
-  <span style="color:#555">→</span>
+  <span style="color:var(--divider)">→</span>
   <label>To <input type="date" id="dateTo"></label>
   <button id="applyBtn">Apply</button>
   <button id="latestBtn">Latest</button>
@@ -117,7 +127,7 @@ function render(startIdx, endIdx) {
       <div class="rank-row">
         <div class="rank-badge">${medal}</div>
         <div class="player-info">
-          <div class="player-name" style="color:${['#ffd700','#c0c0c0','#cd7f32'][i] || '#e2e8f0'}"></div>
+          <div class="player-name"></div>
           <div class="player-habit"></div>
         </div>
         <div class="total-hours">${user.total.toFixed(1)} <small>h</small></div>
@@ -126,8 +136,8 @@ function render(startIdx, endIdx) {
         <div class="progress-bar" style="width:${pct}%;background:${ach.color}"></div>
       </div>
       <div class="achievement-box">
-        <span class="achievement" style="background:${ach.color}22;color:${ach.color};border:1px solid ${ach.color}44">${ach.label}</span>
-        <span style="font-size:0.85rem;color:#94a3b8">${user.studyDays} study days</span>
+        <span class="achievement" style="--ach:${ach.color}">${ach.label}</span>
+        <span class="study-days">${user.studyDays} study days</span>
       </div>
     `;
     card.querySelector('.player-name').textContent = user.displayName;

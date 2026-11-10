@@ -44,7 +44,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 <div class="container">
 <div class="nav"><a href="index.html">← Back to Charts</a></div>
 
-<h1 id="h1Title">⚔ Challenge</h1>
+<h1 id="h1Title">🏆 Challenge</h1>
 <p class="subtitle" id="subtitle">Ranked by total hours studied</p>
 <p class="updated" id="updated"></p>
 
@@ -140,7 +140,7 @@ function render(startIdx, endIdx) {
 function setChallengeTitle(lastIdx) {
   const startYear = DATA_START.getUTCFullYear();
   const endYear = idxToDate(lastIdx).getUTCFullYear();
-  document.getElementById('h1Title').textContent = '⚔ ' +
+  document.getElementById('h1Title').textContent = '🏆 ' +
     (startYear === endYear ? startYear : startYear + '–' + endYear) + ' Challenge';
 }
 

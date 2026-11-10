@@ -23,7 +23,8 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .error{text-align:center;padding:1rem;margin-bottom:1rem;color:var(--error-text);background:var(--error-bg);border-radius:8px;border:1px solid var(--error-border)}
 .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1rem;background:var(--surface);padding:12px 20px;border-radius:12px;border:1px solid var(--border)}
 .toolbar-group{display:flex;align-items:center;gap:6px}
-.toolbar h2{font-size:1.2rem;font-weight:600;min-width:10ch;text-align:center}
+.toolbar h2{font-size:1.2rem;font-weight:600;text-align:center}
+.month-btn{min-width:9rem}
 .btn{border:none;border-radius:6px;padding:7px 14px;font-size:0.9rem;font-family:inherit;font-weight:600;cursor:pointer}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:var(--accent-hover)}
@@ -113,10 +114,10 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 <div class="toolbar">
   <div class="toolbar-group">
     <button class="btn btn-secondary btn-arrow" id="prevMonth" aria-label="Previous month">‹</button>
-    <button class="btn btn-secondary" id="todayBtn">Today</button>
+    <button class="btn btn-secondary month-btn" id="todayBtn" title="Go to today"></button>
     <button class="btn btn-secondary btn-arrow" id="nextMonth" aria-label="Next month">›</button>
   </div>
-  <h2 id="monthTitle"></h2>
+  <h2 id="todayTitle"></h2>
   <button class="btn btn-primary" id="nextMeetingBtn">Next meeting →</button>
 </div>
 

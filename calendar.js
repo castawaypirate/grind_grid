@@ -141,8 +141,14 @@ function renderCalendar() {
   const today = todayStr();
   const next = nextMeetingDate();
 
-  document.getElementById('monthTitle').textContent =
-    first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  // Today's full date in the middle; the month being shown on the button between the arrows (year only when it isn't this year's).
+  document.getElementById('todayTitle').textContent = utcDate(today).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
+  }).replace(',', '');
+  const monthButton = document.getElementById('todayBtn');
+  const sameYear = view.year === utcDate(today).getUTCFullYear();
+  monthButton.textContent = first.toLocaleDateString('en-GB', { month: 'long', year: sameYear ? undefined : 'numeric', timeZone: 'UTC' });
+  monthButton.setAttribute('aria-label', 'Showing ' + first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }) + '. Go to today');
 
   const cells = [];
   for (let i = 0; i < cellCount; i++) {

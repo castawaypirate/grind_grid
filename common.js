@@ -5,10 +5,12 @@ const STORAGE_KEY = 'grindgrid.dateRange.v2';
 const API_URL = 'https://grind-grid-notes.castawayfocuspirate-a34.workers.dev';
 const PASSCODE_KEY = 'grindgrid.notesPasscode';
 const TOAST_MS = 5000;
+const MEETINGS_LOAD_TIMEOUT_MS = 5000;
 const activeCharts = [];
 let DATA_START = null;
 let jsonData = null;
 let toastTimer = null;
+let meetingsRequest = null;
 
 function readStorage(key) {
   try {
@@ -72,6 +74,58 @@ function idxToDate(i) {
 
 function formatChartLabel(d) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function utcDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00Z');
+}
+
+// The viewer's local date as YYYY-MM-DD.
+function todayStr() {
+  const now = new Date();
+  return toDateStr(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+}
+
+function formatDayTitle(dateStr) {
+  const d = utcDate(dateStr);
+  return d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }) + ' ' + formatChartLabel(d);
+}
+
+// Meeting times are the group's local wall-clock time, so they are read in the viewer's time zone.
+function meetingTime(dateStr, time) {
+  return new Date(dateStr + 'T' + time).getTime();
+}
+
+// meetings is { 'YYYY-MM-DD': 'HH:MM' }. Returns the date of the next meeting that hasn't started, or null.
+function nextMeetingIn(meetings) {
+  return Object.keys(meetings).sort().find(d => meetingTime(d, meetings[d]) >= Date.now()) || null;
+}
+
+function meetingCountdown(dateStr, time) {
+  const days = Math.round((utcDate(dateStr) - utcDate(todayStr())) / DAY_MS);
+  if (days === 0) return 'in ' + formatDuration(Math.max(1, (meetingTime(dateStr, time) - Date.now()) / 60000));
+  if (days === 1) return 'tomorrow';
+  return 'in ' + days + ' days';
+}
+
+// Loads meetings once per page (the calendar and the reminder icon share it).
+// writable is false when only the static meetings.json could be read.
+function fetchMeetings() {
+  if (!meetingsRequest) {
+    meetingsRequest = (async () => {
+      try {
+        const meetings = await fetchJson(API_URL + '/meetings', { signal: AbortSignal.timeout(MEETINGS_LOAD_TIMEOUT_MS) });
+        return { meetings, writable: true };
+      } catch (e) {
+        try {
+          return { meetings: await fetchJson('meetings.json'), writable: false };
+        } catch (e2) {
+          return { meetings: {}, writable: false };
+        }
+      }
+    })();
+  }
+  return meetingsRequest;
 }
 
 function formatRangeLabel(start, end) {

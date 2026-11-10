@@ -1,6 +1,5 @@
 // Month calendar: a dot for each user who logged time that day, plus the group's meetings. Needs common.js.
 const USER_COLORS = ['#4d96ff', '#27ae60', '#8e44ad', '#e67e22'];
-const MEETINGS_LOAD_TIMEOUT_MS = 5000;
 const REFRESH_MS = 60000;
 
 let meetings = {};
@@ -10,20 +9,6 @@ let view = null;
 let openDay = null;
 let dayBoxEls = null;
 let renderedFor = '';
-
-function utcDate(dateStr) {
-  return new Date(dateStr + 'T00:00:00Z');
-}
-
-function todayStr() {
-  const now = new Date();
-  return toDateStr(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
-}
-
-function formatDayTitle(dateStr) {
-  const d = utcDate(dateStr);
-  return d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }) + ' ' + formatChartLabel(d);
-}
 
 function userColor(i) {
   return USER_COLORS[i % USER_COLORS.length];
@@ -36,9 +21,8 @@ function hoursOn(user, dateStr) {
   return idx >= 0 && idx < user.daily.length ? user.daily[idx] : null;
 }
 
-// Meeting times are the group's local wall-clock time, so they are read in the viewer's time zone.
 function meetingMoment(dateStr) {
-  return new Date(dateStr + 'T' + meetings[dateStr]).getTime();
+  return meetingTime(dateStr, meetings[dateStr]);
 }
 
 function isUpcoming(dateStr) {
@@ -46,19 +30,12 @@ function isUpcoming(dateStr) {
 }
 
 function nextMeetingDate() {
-  return Object.keys(meetings).sort().find(isUpcoming) || null;
+  return nextMeetingIn(meetings);
 }
 
 function lastMeetingTime() {
   const dates = Object.keys(meetings).sort();
   return dates.length ? meetings[dates[dates.length - 1]] : '';
-}
-
-function relativeText(dateStr) {
-  const days = Math.round((utcDate(dateStr) - utcDate(todayStr())) / DAY_MS);
-  if (days === 0) return 'in ' + formatDuration(Math.max(1, (meetingMoment(dateStr) - Date.now()) / 60000));
-  if (days === 1) return 'tomorrow';
-  return 'in ' + days + ' days';
 }
 
 function renderHeader() {
@@ -69,12 +46,13 @@ function renderHeader() {
   if (next) {
     const when = document.createElement('strong');
     when.textContent = formatDayTitle(next) + ' · ' + meetings[next];
-    line.replaceChildren('Next meeting: ', when, ' (' + relativeText(next) + ')');
+    line.replaceChildren('Next meeting: ', when, ' (' + meetingCountdown(next, meetings[next]) + ')');
   } else {
     line.textContent = 'No meeting set. Click a day to add one.';
   }
   button.disabled = !next;
   button.title = next ? '' : 'No upcoming meeting';
+  if (typeof updateReminder === 'function') updateReminder(meetings);
 }
 
 function renderLegend() {
@@ -458,17 +436,23 @@ function saveMeeting(change) {
 }
 
 async function loadMeetings() {
-  try {
-    meetings = await fetchJson(API_URL + '/meetings', { signal: AbortSignal.timeout(MEETINGS_LOAD_TIMEOUT_MS) });
-    meetingsWritable = true;
-  } catch (e) {
-    meetingsWritable = false;
-    try {
-      meetings = await fetchJson('meetings.json');
-    } catch (e2) {
-      meetings = {};
-    }
-  }
+  const result = await fetchMeetings();
+  meetings = { ...result.meetings };
+  meetingsWritable = result.writable;
+}
+
+function openNextMeeting() {
+  const next = nextMeetingDate();
+  if (!next) return;
+  showMonth(next);
+  openDayBox(next);
+}
+
+// The reminder icon links to calendar.html#next.
+function openLinkedMeeting() {
+  if (location.hash !== '#next') return;
+  history.replaceState(null, '', location.pathname + location.search);
+  openNextMeeting();
 }
 
 // Keeps "in 2h 10 min", today's highlight and the next meeting current while the page stays open.
@@ -484,12 +468,8 @@ function initCalendar() {
   document.getElementById('prevMonth').addEventListener('click', () => moveMonth(-1));
   document.getElementById('nextMonth').addEventListener('click', () => moveMonth(1));
   document.getElementById('todayBtn').addEventListener('click', () => showMonth(todayStr()));
-  document.getElementById('nextMeetingBtn').addEventListener('click', () => {
-    const next = nextMeetingDate();
-    if (!next) return;
-    showMonth(next);
-    openDayBox(next);
-  });
+  document.getElementById('nextMeetingBtn').addEventListener('click', openNextMeeting);
+  window.addEventListener('hashchange', openLinkedMeeting);
 
   const grid = document.getElementById('grid');
   grid.addEventListener('click', event => {
@@ -536,5 +516,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderAll();
   if (openDay) showDayState();
+  openLinkedMeeting();
   setInterval(refresh, REFRESH_MS);
 });

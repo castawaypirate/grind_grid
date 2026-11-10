@@ -49,6 +49,17 @@ function setThemeMode(mode) {
   applyTheme();
 }
 
+// The top-right corner of every page: the meeting reminder and the theme switch.
+function cornerTools() {
+  let corner = document.querySelector('.corner-tools');
+  if (!corner) {
+    corner = document.createElement('div');
+    corner.className = 'corner-tools';
+    document.body.prepend(corner);
+  }
+  return corner;
+}
+
 function buildThemeSwitch() {
   const group = document.createElement('div');
   group.className = 'theme-switch';
@@ -66,7 +77,7 @@ function buildThemeSwitch() {
     group.appendChild(button);
   }
 
-  document.body.prepend(group);
+  cornerTools().appendChild(group);
   updateThemeSwitch();
 }
 

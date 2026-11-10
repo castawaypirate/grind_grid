@@ -193,9 +193,12 @@ async function initRangePage({ render, errorEl, onData }) {
   }
 
   // Charts take their colors when they are drawn, so draw them again in the new theme.
-  onThemeChange(() => {
-    if (shownRange) draw(...shownRange);
-  });
+  // The check keeps an old cached page without theme.js working.
+  if (typeof onThemeChange === 'function') {
+    onThemeChange(() => {
+      if (shownRange) draw(...shownRange);
+    });
+  }
 
   function applyRange({ save }) {
     const dateFrom = new Date(fromInput.value + 'T00:00:00Z');

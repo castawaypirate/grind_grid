@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grind Grid</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
-<script src="theme.js"></script>
-<link rel="stylesheet" href="theme.css">
+<script src="theme.js?v=2"></script>
+<link rel="stylesheet" href="theme.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="notes.css">
+<link rel="stylesheet" href="notes.css?v=2">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:2rem 1rem}
@@ -56,8 +56,8 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 <div id="rangeLabel" class="range-label"></div>
 <div id="charts"></div>
 </div>
-<script src="common.js"></script>
-<script src="notes.js"></script>
+<script src="common.js?v=2"></script>
+<script src="notes.js?v=2"></script>
 <script>
 function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
   const chart = new Chart(canvas.getContext('2d'), {

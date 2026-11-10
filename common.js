@@ -1,9 +1,66 @@
-// Shared by index.html, challenge.html and 1440-shots.html.
+// Shared by index.html, challenge.html, 1440-shots.html and calendar.html.
 const DAY_MS = 86400000;
 const STORAGE_KEY = 'grindgrid.dateRange.v2';
+// The worker that saves notes and meetings (worker/notes-worker.js).
+const API_URL = 'https://grind-grid-notes.castawayfocuspirate-a34.workers.dev';
+const PASSCODE_KEY = 'grindgrid.notesPasscode';
+const TOAST_MS = 5000;
 const activeCharts = [];
 let DATA_START = null;
 let jsonData = null;
+let toastTimer = null;
+
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch (e) {}
+}
+
+async function fetchJson(url, options) {
+  const res = await fetch(url, options);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// Checks the passcode with the worker and remembers it when it's right.
+// Returns null on success, otherwise a message to show.
+async function checkPasscode(passcode) {
+  try {
+    const res = await fetch(API_URL + '/verify', {
+      method: 'POST',
+      headers: { 'X-Notes-Passcode': passcode }
+    });
+    if (res.ok) {
+      writeStorage(PASSCODE_KEY, passcode);
+      return null;
+    }
+    return res.status === 401 ? 'Wrong passcode' : 'Server error';
+  } catch (e) {
+    return 'Connection problem';
+  }
+}
+
+function showToast(message) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, TOAST_MS);
+}
 
 function toDateStr(d) {
   return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
@@ -94,6 +151,23 @@ function renderLegend(chart, legendEl) {
   });
 }
 
+// Loads data.json into jsonData and DATA_START.
+async function loadData() {
+  const res = await fetch('data.json');
+  if (!res.ok) throw new Error('Failed to load data.json');
+  jsonData = await res.json();
+
+  if (!jsonData.startDate) throw new Error('data.json is missing startDate');
+  DATA_START = new Date(jsonData.startDate + 'T00:00:00Z');
+}
+
+function showError(errorEl, err) {
+  const box = document.createElement('div');
+  box.className = 'error';
+  box.textContent = 'Error: ' + err.message;
+  errorEl.replaceChildren(box);
+}
+
 // Loads data.json and wires up the date range picker.
 // render(startIdx, endIdx) draws the page; onData(lastIdx) runs once after loading.
 async function initRangePage({ render, errorEl, onData }) {
@@ -129,12 +203,7 @@ async function initRangePage({ render, errorEl, onData }) {
   }
 
   try {
-    const res = await fetch('data.json');
-    if (!res.ok) throw new Error('Failed to load data.json');
-    jsonData = await res.json();
-
-    if (!jsonData.startDate) throw new Error('data.json is missing startDate');
-    DATA_START = new Date(jsonData.startDate + 'T00:00:00Z');
+    await loadData();
 
     const lastIdx = jsonData.labels.length - 1;
     const firstDate = toDateStr(DATA_START);
@@ -163,9 +232,6 @@ async function initRangePage({ render, errorEl, onData }) {
       applyRange({ save: true });
     });
   } catch (err) {
-    const box = document.createElement('div');
-    box.className = 'error';
-    box.textContent = 'Error: ' + err.message;
-    errorEl.replaceChildren(box);
+    showError(errorEl, err);
   }
 }

@@ -8,5 +8,5 @@
 .note-unlock[hidden]{display:none}
 .note-unlock input{flex:1;min-width:0;padding:3px 5px;background:#fffde7;border:1px solid #000;border-radius:3px;color:inherit;font:inherit}
 .note-unlock button{padding:3px 8px;background:#000;border:none;border-radius:3px;color:#fff9c4;cursor:pointer;font:inherit}
-#noteToast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:1001;max-width:calc(100vw - 2rem);padding:8px 14px;background:#7f1d1d;border-radius:6px;color:#fff;font:bold 13px 'Courier New',Courier,monospace}
-#noteToast[hidden]{display:none}
+#toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:1001;max-width:calc(100vw - 2rem);padding:8px 14px;background:#7f1d1d;border-radius:6px;color:#fff;font:bold 13px 'Courier New',Courier,monospace}
+#toast[hidden]{display:none}

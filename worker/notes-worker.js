@@ -1,10 +1,11 @@
-// Saves day notes to notes.json in the repo, so the GitHub key never reaches a browser.
+// Saves day notes (notes.json) and meetings (meetings.json) in the repo, so the GitHub key never reaches a browser.
 // Secrets (set with `wrangler secret put`): GITHUB_TOKEN, NOTES_PASSCODE.
-const CONTENTS_URL = 'https://api.github.com/repos/castawaypirate/grind_grid/contents/notes.json';
+const CONTENTS_URL = 'https://api.github.com/repos/castawaypirate/grind_grid/contents/';
 const BRANCH = 'main';
 const USERNAMES = new Set(['castawaypirate', 'barbalias', 'Spl4sssh', 'jimmy_hawkins']);
 const MAX_NOTE_LENGTH = 200;
 const MAX_SAVE_ATTEMPTS = 3;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ALLOWED_ORIGIN = /^(https:\/\/castawaypirate\.github\.io|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/;
 
 function corsHeaders(request) {
@@ -52,18 +53,20 @@ function decodeContent(base64) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-function encodeContent(notes) {
-  const bytes = new TextEncoder().encode(JSON.stringify(notes, null, 2) + '\n');
+function encodeContent(data) {
+  const bytes = new TextEncoder().encode(JSON.stringify(data, null, 2) + '\n');
   let binary = '';
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary);
 }
 
-async function readNotes(env) {
-  const res = await fetch(CONTENTS_URL + '?ref=' + BRANCH, { headers: githubHeaders(env) });
-  if (!res.ok) throw new Error('GitHub read failed: HTTP ' + res.status);
-  const file = await res.json();
-  return { notes: decodeContent(file.content), sha: file.sha };
+// A file that doesn't exist yet reads as empty, and the first save creates it.
+async function readJsonFile(env, file) {
+  const res = await fetch(CONTENTS_URL + file + '?ref=' + BRANCH, { headers: githubHeaders(env) });
+  if (res.status === 404) return { data: {}, sha: undefined };
+  if (!res.ok) throw new Error('GitHub read of ' + file + ' failed: HTTP ' + res.status);
+  const body = await res.json();
+  return { data: decodeContent(body.content), sha: body.sha };
 }
 
 function applyNote(notes, username, date, text) {
@@ -80,26 +83,41 @@ function applyNote(notes, username, date, text) {
   return updated;
 }
 
-async function saveNote(env, username, date, text) {
+// change(data) returns the new contents, or null when there is nothing to write.
+async function updateJsonFile(env, file, message, change) {
   for (let attempt = 1; attempt <= MAX_SAVE_ATTEMPTS; attempt++) {
-    const { notes, sha } = await readNotes(env);
-    if ((notes[username]?.[date] || '') === text) return;
+    const { data, sha } = await readJsonFile(env, file);
+    const updated = change(data);
+    if (!updated) return;
 
-    const res = await fetch(CONTENTS_URL, {
+    const res = await fetch(CONTENTS_URL + file, {
       method: 'PUT',
       headers: { ...githubHeaders(env), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `chore: update note for ${username} on ${date}`,
-        content: encodeContent(applyNote(notes, username, date, text)),
-        sha,
-        branch: BRANCH
-      })
+      body: JSON.stringify({ message, content: encodeContent(updated), sha, branch: BRANCH })
     });
     if (res.ok) return;
-    // 409 means someone else changed the file after we read it, so read it again.
-    if (res.status !== 409) throw new Error('GitHub write failed: HTTP ' + res.status);
+    // 409 (or 422 when two saves race to create the file) means someone else changed it after we read it, so read it again.
+    if (res.status !== 409 && res.status !== 422) throw new Error('GitHub write of ' + file + ' failed: HTTP ' + res.status);
   }
-  throw new Error('GitHub write kept conflicting');
+  throw new Error('GitHub write of ' + file + ' kept conflicting');
+}
+
+function sortedByKey(obj) {
+  return Object.fromEntries(Object.keys(obj).sort().map(k => [k, obj[k]]));
+}
+
+function applyMeeting(meetings, date, time, from) {
+  const updated = { ...meetings };
+  if (from) delete updated[from];
+  if (time) updated[date] = time;
+  else delete updated[date];
+  return sortedByKey(updated);
+}
+
+function meetingMessage(date, time, from) {
+  if (!time) return `chore: remove meeting on ${date}`;
+  if (from && from !== date) return `chore: move meeting from ${from} to ${date} at ${time}`;
+  return `chore: set meeting on ${date} at ${time}`;
 }
 
 function isRealDate(date) {
@@ -124,7 +142,29 @@ async function handleSave(request, env) {
   const trimmed = text.trim();
   if (trimmed.length > MAX_NOTE_LENGTH) return json(request, 400, { error: 'Note is too long' });
 
-  await saveNote(env, username, date, trimmed);
+  await updateJsonFile(env, 'notes.json', `chore: update note for ${username} on ${date}`, notes =>
+    (notes[username]?.[date] || '') === trimmed ? null : applyNote(notes, username, date, trimmed));
+  return json(request, 200, { ok: true });
+}
+
+async function handleMeetingSave(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return json(request, 400, { error: 'Invalid JSON' });
+  }
+
+  const { date, time, from } = body || {};
+  if (!isRealDate(date)) return json(request, 400, { error: 'Invalid date' });
+  if (from !== undefined && from !== null && !isRealDate(from)) return json(request, 400, { error: 'Invalid previous date' });
+  if (typeof time !== 'string' || (time && !TIME_PATTERN.test(time))) return json(request, 400, { error: 'Invalid time' });
+
+  const message = meetingMessage(date, time, from);
+  await updateJsonFile(env, 'meetings.json', message, meetings => {
+    const updated = applyMeeting(meetings, date, time, from);
+    return JSON.stringify(updated) === JSON.stringify(sortedByKey(meetings)) ? null : updated;
+  });
   return json(request, 200, { ok: true });
 }
 
@@ -137,16 +177,23 @@ export default {
     }
 
     try {
-      if (pathname === '/notes' && request.method === 'GET') {
-        return json(request, 200, (await readNotes(env)).notes);
+      if (request.method === 'GET' && pathname === '/notes') {
+        return json(request, 200, (await readJsonFile(env, 'notes.json')).data);
+      }
+      if (request.method === 'GET' && pathname === '/meetings') {
+        return json(request, 200, (await readJsonFile(env, 'meetings.json')).data);
       }
 
-      const isSave = pathname === '/notes' && request.method === 'POST';
-      const isVerify = pathname === '/verify' && request.method === 'POST';
-      if (!isSave && !isVerify) return json(request, 404, { error: 'Not found' });
+      const handlers = {
+        '/notes': handleSave,
+        '/meetings': handleMeetingSave,
+        '/verify': () => json(request, 200, { ok: true })
+      };
+      const handler = request.method === 'POST' && Object.hasOwn(handlers, pathname) ? handlers[pathname] : null;
+      if (!handler) return json(request, 404, { error: 'Not found' });
 
       if (!await passcodeMatches(request, env)) return json(request, 401, { error: 'Wrong passcode' });
-      return isVerify ? json(request, 200, { ok: true }) : await handleSave(request, env);
+      return await handler(request, env);
     } catch (err) {
       console.error(err.message);
       return json(request, 502, { error: 'Could not reach GitHub' });

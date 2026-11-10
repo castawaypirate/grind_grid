@@ -65,19 +65,22 @@
 .theme-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .theme-switch svg{width:15px;height:15px;flex:none}
 
-/* Meeting reminder: a calendar icon that shows the next meeting on hover. */
-.meeting-reminder{position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted);text-decoration:none;transition:color .15s,border-color .15s}
-.meeting-reminder svg{width:16px;height:16px}
-.meeting-reminder:hover{color:var(--text)}
-.meeting-reminder:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.meeting-reminder.has-meeting{color:var(--accent);border-color:var(--accent)}
-.meeting-reminder.has-meeting::after{content:'';position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--surface)}
-.reminder-tip{position:absolute;top:calc(100% + 8px);right:0;display:flex;flex-direction:column;gap:2px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);color:var(--text);font-size:0.85rem;text-align:right;white-space:nowrap;pointer-events:none;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease}
-.meeting-reminder:hover .reminder-tip,.meeting-reminder:focus-visible .reminder-tip{opacity:1;transform:none}
+/* Meeting reminder: a calendar icon in the corner; clicking it shows the next meeting. */
+.meeting-reminder{position:relative;order:1}
+.reminder-btn{position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s}
+.reminder-btn svg{width:16px;height:16px}
+.reminder-btn:hover{color:var(--text)}
+.reminder-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.reminder-btn.has-meeting{color:var(--accent);border-color:var(--accent)}
+.reminder-btn.has-meeting::after{content:'';position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--surface)}
+.reminder-tip{position:absolute;top:calc(100% + 8px);right:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);color:var(--text);font-size:0.85rem;white-space:nowrap;visibility:hidden;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease,visibility 0s linear .15s}
+.meeting-reminder.open .reminder-tip{visibility:visible;opacity:1;transform:none;transition:opacity .15s ease,transform .15s ease,visibility 0s}
 .reminder-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .reminder-when{font-weight:700}
 .reminder-when:empty{display:none}
 .reminder-countdown{color:var(--muted)}
+.reminder-link{margin-top:6px;color:var(--accent);font-size:0.8rem;font-weight:600;text-decoration:none}
+.reminder-link:hover{text-decoration:underline}
 
 @media (prefers-reduced-motion:reduce){
   .theme-switch button,.reminder-tip{transition:none}

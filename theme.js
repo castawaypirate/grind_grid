@@ -49,7 +49,7 @@ function setThemeMode(mode) {
   applyTheme();
 }
 
-// The top-right corner of every page: the meeting reminder and the theme switch.
+// The bar across the top of every page: the meeting reminder (left) and the theme switch (right).
 function cornerTools() {
   let corner = document.querySelector('.corner-tools');
   if (!corner) {

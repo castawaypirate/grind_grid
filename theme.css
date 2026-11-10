@@ -54,12 +54,18 @@
   --chart-study-fill:rgba(34,197,94,0.2);
 }
 
-.theme-switch{position:absolute;top:1rem;right:1rem;z-index:10;display:flex;gap:2px;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:999px}
-.theme-switch button{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:none;border-radius:999px;background:none;color:var(--muted);cursor:pointer}
-.theme-switch button:hover{color:var(--text);background:var(--surface-alt)}
-.theme-switch button[aria-pressed="true"]{background:var(--accent);color:#fff}
-.theme-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.theme-switch svg{width:15px;height:15px}
+.theme-switch{position:absolute;top:1rem;right:1rem;z-index:10;display:flex;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:999px}
+/* Only the chosen theme shows; hovering (or tabbing in) slides the other two out to its left. */
+.theme-switch button{display:flex;align-items:center;justify-content:center;flex:none;width:0;height:28px;margin:0;padding:0;overflow:hidden;opacity:0;border:none;border-radius:999px;background:none;color:var(--muted);cursor:pointer;transition:width .2s ease,margin .2s ease,opacity .2s ease,background-color .15s,color .15s}
+.theme-switch button[aria-pressed="true"]{order:1;width:28px;opacity:1;background:var(--accent);color:#fff}
+.theme-switch:hover button,.theme-switch:has(:focus-visible) button{width:28px;opacity:1}
+.theme-switch:hover button:not([aria-pressed="true"]),.theme-switch:has(:focus-visible) button:not([aria-pressed="true"]){margin-right:2px}
+.theme-switch button:not([aria-pressed="true"]):hover{color:var(--text);background:var(--surface-alt)}
+.theme-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.theme-switch svg{width:15px;height:15px;flex:none}
+@media (prefers-reduced-motion:reduce){
+  .theme-switch button{transition:none}
+}
 @media (max-width:640px){
   .theme-switch{position:static;width:max-content;margin:-0.75rem 0 0.75rem auto}
 }

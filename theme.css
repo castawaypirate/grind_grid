@@ -79,6 +79,8 @@
 .reminder-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .reminder-when{font-weight:700}
 .reminder-when:empty{display:none}
+.reminder-timer{margin-top:4px;font:bold 1.15rem 'Courier New',Courier,monospace;font-variant-numeric:tabular-nums;color:var(--accent)}
+.reminder-timer:empty,.reminder-countdown:empty{display:none}
 .reminder-countdown{color:var(--muted)}
 .reminder-link{margin-top:6px;color:var(--accent);font-size:0.8rem;font-weight:600;text-decoration:none}
 .reminder-link:hover{text-decoration:underline}

@@ -56,15 +56,29 @@
 
 .corner-tools{position:absolute;top:1rem;left:1rem;right:1rem;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:none}
 .corner-tools>*{pointer-events:auto}
-.theme-switch{display:flex;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:999px}
-/* Only the chosen theme shows; hovering (or tabbing in) slides the other two out to its left. */
-.theme-switch button{display:flex;align-items:center;justify-content:center;flex:none;width:0;height:28px;margin:0;padding:0;overflow:hidden;opacity:0;border:none;border-radius:999px;background:none;color:var(--muted);cursor:pointer;transition:width .2s ease,margin .2s ease,opacity .2s ease,background-color .15s,color .15s}
-.theme-switch button[aria-pressed="true"]{order:1;width:28px;opacity:1;background:var(--accent);color:#fff}
-.theme-switch:hover button,.theme-switch:has(:focus-visible) button{width:28px;opacity:1}
-.theme-switch:hover button:not([aria-pressed="true"]),.theme-switch:has(:focus-visible) button:not([aria-pressed="true"]){margin-right:2px}
+/* Closed, only the chosen theme shows; hovering (or tabbing in) opens the other two to its left. Clicking one slides
+   the blue highlight over to it; the icons themselves only move when the switch closes (theme.js). */
+.theme-switch{position:relative;display:flex;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:999px;transition:background-color .4s,border-color .4s}
+.theme-switch button{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:0;height:28px;margin:0;padding:0;overflow:hidden;opacity:0;border:none;border-radius:999px;background:none;color:var(--muted);cursor:pointer;transition:width .25s cubic-bezier(.4,0,.2,1),margin .25s cubic-bezier(.4,0,.2,1),opacity .2s ease,background-color .15s,color .2s}
+.theme-switch button[aria-pressed="true"]{width:28px;opacity:1;color:#fff}
+:is(.theme-switch:hover,.theme-switch.open,.theme-switch:has(:focus-visible)) button{width:28px;opacity:1}
+:is(.theme-switch:hover,.theme-switch.open,.theme-switch:has(:focus-visible)) button+button{margin-left:2px}
 .theme-switch button:not([aria-pressed="true"]):hover{color:var(--text);background:var(--surface-alt)}
 .theme-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.theme-switch svg{width:15px;height:15px;flex:none}
+.theme-switch svg{width:15px;height:15px;flex:none;transform:scale(.6);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+.theme-switch button[aria-pressed="true"] svg,:is(.theme-switch:hover,.theme-switch.open,.theme-switch:has(:focus-visible)) svg{transform:none}
+/* The highlight sits behind the chosen button: at the right end when closed, data-after buttons (30px each) left of it when open. */
+.theme-highlight{position:absolute;top:3px;right:3px;width:28px;height:28px;border-radius:999px;background:var(--accent);pointer-events:none;transition:transform .25s cubic-bezier(.4,0,.2,1)}
+:is(.theme-switch:hover,.theme-switch.open,.theme-switch:has(:focus-visible))[data-after="1"] .theme-highlight{transform:translateX(-30px)}
+:is(.theme-switch:hover,.theme-switch.open,.theme-switch:has(:focus-visible))[data-after="2"] .theme-highlight{transform:translateX(-60px)}
+
+/* Theme changes (theme.js) crossfade the page. The switch is kept out of the crossfade so its own animation stays live. */
+::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation-duration:.4s;animation-timing-function:cubic-bezier(.4,0,.2,1)}
+.theme-switch{view-transition-name:theme-switch}
+::view-transition-group(theme-switch),::view-transition-new(theme-switch){animation:none}
+::view-transition-old(theme-switch){display:none}
+/* Browsers without view transitions fade just the colors (the switch keeps its own transitions). */
+html.theme-fading :not(.theme-switch,.theme-switch *),html.theme-fading ::before,html.theme-fading ::after{transition:background-color .4s ease,border-color .4s ease,color .4s ease,box-shadow .4s ease,fill .4s ease,stroke .4s ease!important}
 
 /* Meeting reminder: a calendar icon in the top-left corner; clicking it shows the next meeting. */
 .meeting-reminder{position:relative;order:-1}
@@ -86,7 +100,7 @@
 .reminder-link:hover{text-decoration:underline}
 
 @media (prefers-reduced-motion:reduce){
-  .theme-switch button,.reminder-tip{transition:none}
+  .theme-switch,.theme-switch button,.theme-switch svg,.theme-highlight,.reminder-tip{transition:none}
 }
 @media (max-width:640px){
   .corner-tools{position:static;margin:-0.75rem 0 0.75rem}

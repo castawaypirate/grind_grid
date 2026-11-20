@@ -306,10 +306,19 @@ async function initRangePage({ render, errorEl, onData }) {
   }
 
   // Charts take their colors when they are drawn, so draw them again in the new theme.
+  // They are drawn at once, without growing in again: the page fades between the themes instead (theme.js).
   // The check keeps an old cached page without theme.js working.
   if (typeof onThemeChange === 'function') {
     onThemeChange(() => {
-      if (shownRange) draw(...shownRange);
+      if (!shownRange) return;
+      if (typeof Chart === 'undefined') return draw(...shownRange);
+      const animation = Chart.defaults.animation;
+      Chart.defaults.animation = false;
+      try {
+        draw(...shownRange);
+      } finally {
+        Chart.defaults.animation = animation;
+      }
     });
   }
 

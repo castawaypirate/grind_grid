@@ -18,6 +18,17 @@ const USERS = [
 
 const GOALS = { daily: 5, weekly: 35, monthly: 150 };
 
+// The group's time zone (common.js has the same setting). data.json stops at the last day that is over there,
+// so the charts never end on a half-logged day; that day is picked up by the next run.
+const GROUP_TIME_ZONE = 'Europe/Athens';
+
+function lastFinishedDayUTC() {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: GROUP_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const d = new Date(today + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d;
+}
+
 function startOfCurrentYearUTC() {
   const n = new Date();
   return new Date(Date.UTC(n.getUTCFullYear(), 0, 1));
@@ -110,31 +121,27 @@ async function main() {
     process.exit(1);
   }
 
-  const now = new Date();
-  const todayCap = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const lastDay = lastFinishedDayUTC();
+  const lastDayStr = lastDay.toISOString().slice(0, 10);
 
   let globalStart = null;
-  let globalEnd = null;
+  let unfinished = 0;
   for (const { data } of validResults) {
     const hm = data.habits[0].heatmap || [];
     for (const e of hm) {
       const d = new Date(e.day + 'T00:00:00Z');
-      if (d > todayCap) {
-        console.error(`Ignoring future-dated heatmap entry ${e.day} (after today ${todayCap.toISOString().slice(0,10)})`);
+      if (d > lastDay) {
+        unfinished++;
         continue;
       }
       if (!globalStart || d < globalStart) globalStart = d;
-      if (!globalEnd || d > globalEnd) globalEnd = d;
     }
   }
+  if (unfinished) console.log(`Leaving out ${unfinished} entr${unfinished === 1 ? 'y' : 'ies'} after ${lastDayStr} (day not over yet in ${GROUP_TIME_ZONE})`);
 
-  if (!globalStart) globalStart = startOfCurrentYearUTC();
-  if (!globalEnd || globalEnd < globalStart) globalEnd = new Date(globalStart);
-
-  // If we haven't seen today's date in heatmaps, extend to today with zero-filled data
-  if (globalEnd < todayCap) {
-    globalEnd = todayCap;
-  }
+  if (!globalStart || globalStart > lastDay) globalStart = startOfCurrentYearUTC();
+  // Always run up to the last finished day, zero-filling days nobody logged.
+  const globalEnd = lastDay < globalStart ? new Date(globalStart) : lastDay;
 
   const labels = [];
   const cur = new Date(globalStart);

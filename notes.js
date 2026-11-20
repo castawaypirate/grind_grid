@@ -1,34 +1,15 @@
 // Day notes for the chart pages. Needs common.js.
-const NOTES_API_URL = 'https://grind-grid-notes.castawayfocuspirate-a34.workers.dev';
 const NOTES_ENABLED_KEY = 'grindgrid.notesEnabled';
-const NOTES_PASSCODE_KEY = 'grindgrid.notesPasscode';
 const NOTES_DRAFTS_KEY = 'grindgrid.noteDrafts';
 const NOTE_MAX_LENGTH = 200;
 const NOTE_DOT_COLOR = '#f59e0b';
 const NOTES_LOAD_TIMEOUT_MS = 5000;
-const NOTE_TOAST_MS = 5000;
 
 let notes = {};
 let notesWritable = false;
 let openNote = null;
 let noteBoxEls = null;
 let noteSaveQueue = Promise.resolve();
-let noteToastTimer = null;
-
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch (e) {
-    return null;
-  }
-}
-
-function writeStorage(key, value) {
-  try {
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch (e) {}
-}
 
 function notesEnabled() {
   return readStorage(NOTES_ENABLED_KEY) !== 'false';
@@ -64,22 +45,15 @@ function refreshNoteDots() {
   activeCharts.forEach(chart => chart.update('none'));
 }
 
-async function fetchNotesJson(url, options) {
-  const res = await fetch(url, options);
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
-}
-
 async function loadNotes() {
   let loaded = {};
   let writable = false;
   try {
-    if (!NOTES_API_URL) throw new Error('Notes API not configured');
-    loaded = await fetchNotesJson(NOTES_API_URL + '/notes', { signal: AbortSignal.timeout(NOTES_LOAD_TIMEOUT_MS) });
+    loaded = await fetchJson(API_URL + '/notes', { signal: AbortSignal.timeout(NOTES_LOAD_TIMEOUT_MS) });
     writable = true;
   } catch (e) {
     try {
-      loaded = await fetchNotesJson('notes.json');
+      loaded = await fetchJson('notes.json');
     } catch (e2) {}
   }
 
@@ -151,7 +125,7 @@ function getNoteBoxEls() {
 }
 
 function canEditNotes() {
-  return notesWritable && !!readStorage(NOTES_PASSCODE_KEY);
+  return notesWritable && !!readStorage(PASSCODE_KEY);
 }
 
 function showNoteCounter() {
@@ -210,14 +184,14 @@ function saveNote(username, date, text, previous) {
 
   noteSaveQueue = noteSaveQueue.then(async () => {
     try {
-      const res = await fetch(NOTES_API_URL + '/notes', {
+      const res = await fetch(API_URL + '/notes', {
         method: 'POST',
         keepalive: true,
-        headers: { 'Content-Type': 'application/json', 'X-Notes-Passcode': readStorage(NOTES_PASSCODE_KEY) || '' },
+        headers: { 'Content-Type': 'application/json', 'X-Notes-Passcode': readStorage(PASSCODE_KEY) || '' },
         body: JSON.stringify({ username, date, text })
       });
       if (res.status === 401) {
-        writeStorage(NOTES_PASSCODE_KEY, null);
+        writeStorage(PASSCODE_KEY, null);
         throw new Error('wrong passcode');
       }
       if (!res.ok) throw new Error('server error');
@@ -227,7 +201,7 @@ function saveNote(username, date, text, previous) {
       if (noteFor(username, date) === text) setNote(username, date, previous);
       refreshNoteDots();
       const reason = err.message === 'wrong passcode' ? err.message : 'connection problem';
-      showNoteToast('Note not saved (' + reason + '). Your text is kept for next time.');
+      showToast('Note not saved (' + reason + '). Your text is kept for next time.');
     }
   });
 }
@@ -236,34 +210,11 @@ async function verifyPasscode(passcode) {
   const note = openNote;
   const { status } = getNoteBoxEls();
   status.textContent = 'Checking...';
-  let message;
-  try {
-    const res = await fetch(NOTES_API_URL + '/verify', {
-      method: 'POST',
-      headers: { 'X-Notes-Passcode': passcode }
-    });
-    if (res.ok) writeStorage(NOTES_PASSCODE_KEY, passcode);
-    else message = res.status === 401 ? 'Wrong passcode' : 'Server error';
-  } catch (e) {
-    message = 'Connection problem';
-  }
+  const message = await checkPasscode(passcode);
 
   if (openNote !== note) return;
   if (message) status.textContent = message;
   else showNoteState();
-}
-
-function showNoteToast(message) {
-  let toast = document.getElementById('noteToast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'noteToast';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = message;
-  toast.hidden = false;
-  clearTimeout(noteToastTimer);
-  noteToastTimer = setTimeout(() => { toast.hidden = true; }, NOTE_TOAST_MS);
 }
 
 function initNotes() {

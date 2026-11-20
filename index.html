@@ -5,33 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grind Grid</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="theme.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="notes.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;padding:2rem 1rem}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:2rem 1rem}
 .container{max-width:1000px;margin:0 auto}
 h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
-.subtitle{text-align:center;color:#64748b;margin-bottom:2rem;font-size:0.9rem}
-.chart-wrapper{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1.5rem;margin-bottom:2rem}
+.subtitle{text-align:center;color:var(--muted);margin-bottom:2rem;font-size:0.9rem}
+.chart-wrapper{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:2rem}
 .chart-title{font-size:1.1rem;font-weight:600;margin-bottom:1rem;text-transform:capitalize}
 .chart-wrapper canvas{width:100%!important;height:450px!important}
 .chart-legend{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 8px;margin-bottom:12px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
-.chart-legend label{display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border-radius:6px;font-size:11px;color:#475569;cursor:pointer;user-select:none;white-space:nowrap;transition:opacity .15s,background .15s}
-.chart-legend label:hover{background:#f1f5f9}
+.chart-legend label{display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border-radius:6px;font-size:11px;color:var(--text-soft);cursor:pointer;user-select:none;white-space:nowrap;transition:opacity .15s,background .15s}
+.chart-legend label:hover{background:var(--surface-alt)}
 .chart-legend input{width:13px;height:13px;margin:0;cursor:pointer}
 .chart-legend .legend-line{width:18px;height:0;flex:none;border-top:2px solid currentColor}
 .chart-legend .legend-line.dashed{border-top-style:dashed}
 .chart-legend label.off{opacity:.4}
 .chart-legend label.off .legend-text{text-decoration:line-through}
-.error{text-align:center;padding:2rem;color:#dc2626;background:#fef2f2;border-radius:8px;border:1px solid #fecaca}
-.range-picker{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1rem;background:#fff;padding:14px 20px;border-radius:12px;border:1px solid #e2e8f0}
-.range-picker label{color:#64748b;font-size:0.9rem;display:flex;align-items:center;gap:6px}
-.range-picker input[type=date]{background:#fff;color:#1e293b;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:0.9rem;font-family:inherit}
-.range-picker input[type=date]:focus{outline:none;border-color:#4d96ff}
-.range-picker button{background:#4d96ff;color:white;border:none;border-radius:6px;padding:7px 18px;font-size:0.9rem;cursor:pointer;font-weight:600}
-.range-picker button:hover{background:#3b7de6}
-.range-label{text-align:center;color:#64748b;font-size:0.85rem;margin-bottom:1rem}
+.error{text-align:center;padding:2rem;color:var(--error-text);background:var(--error-bg);border-radius:8px;border:1px solid var(--error-border)}
+.range-picker{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1rem;background:var(--surface);padding:14px 20px;border-radius:12px;border:1px solid var(--border)}
+.range-picker label{color:var(--muted);font-size:0.9rem;display:flex;align-items:center;gap:6px}
+.range-picker input[type=date]{background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.9rem;font-family:inherit}
+.range-picker input[type=date]:focus{outline:none;border-color:var(--accent)}
+.range-picker button{background:var(--accent);color:white;border:none;border-radius:6px;padding:7px 18px;font-size:0.9rem;cursor:pointer;font-weight:600}
+.range-picker button:hover{background:var(--accent-hover)}
+.range-label{text-align:center;color:var(--muted);font-size:0.85rem;margin-bottom:1rem}
 </style>
 </head>
 <body>
@@ -39,12 +41,13 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 <h1>Grind Grid</h1>
 <p class="subtitle">Habit tracking comparison</p>
 <p style="text-align:center;margin-bottom:1rem;display:flex;justify-content:center;gap:1.5rem;flex-wrap:wrap">
-  <a href="challenge.html" style="color:#64748b;text-decoration:none;font-size:0.9rem">⚔ View Challenge Leaderboard →</a>
-  <a href="1440-shots.html" style="color:#64748b;text-decoration:none;font-size:0.9rem">⏱ View 1440 Shots →</a>
+  <a href="challenge.html" style="color:var(--muted);text-decoration:none;font-size:0.9rem">🏆 View Challenge Leaderboard →</a>
+  <a href="1440-shots.html" style="color:var(--muted);text-decoration:none;font-size:0.9rem">⏳ View 1440 Shots →</a>
+  <a href="calendar.html" style="color:var(--muted);text-decoration:none;font-size:0.9rem">📅 View Calendar →</a>
 </p>
 <div class="range-picker">
   <label>From <input type="date" id="dateFrom"></label>
-  <span style="color:#cbd5e1">→</span>
+  <span style="color:var(--divider)">→</span>
   <label>To <input type="date" id="dateTo"></label>
   <button id="applyBtn">Apply</button>
   <button id="latestBtn">Latest</button>
@@ -54,6 +57,7 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 <div id="charts"></div>
 </div>
 <script src="common.js"></script>
+<script src="reminder.js"></script>
 <script src="notes.js"></script>
 <script>
 function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
@@ -65,16 +69,16 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Daily Hours',
           data: data.daily,
-          borderColor: '#2c3e50',
-          backgroundColor: 'rgba(44,62,80,0.10)',
+          borderColor: cssVar('--chart-daily'),
+          backgroundColor: cssVar('--chart-daily-fill'),
           fill: true,
           tension: 0.12,
-          ...noteDotOptions(user.username, startIdx, 1.5, 4, 'rgba(44,62,80,0.10)')
+          ...noteDotOptions(user.username, startIdx, 1.5, 4, cssVar('--chart-daily-fill'))
         },
         {
           label: 'Daily Goal (' + goals.daily + 'h)',
           data: new Array(labels.length).fill(goals.daily),
-          borderColor: 'black',
+          borderColor: cssVar('--chart-ink'),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
           pointRadius: 0,
@@ -92,7 +96,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Weekly Goal (' + goals.weekly + 'h)',
           data: new Array(labels.length).fill(goals.weekly),
-          borderColor: 'black',
+          borderColor: cssVar('--chart-ink'),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
           pointRadius: 0,
@@ -101,7 +105,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Monthly Hours',
           data: data.monthlyLine,
-          borderColor: '#8e44ad',
+          borderColor: cssVar('--chart-monthly'),
           backgroundColor: 'rgba(142,68,173,0.06)',
           fill: false,
           tension: 0.12,

@@ -1,0 +1,93 @@
+/* Colors for every page. theme.js sets data-theme on <html> to "light" or "dark". */
+:root{
+  color-scheme:light;
+  --bg:#f8fafc;
+  --surface:#fff;
+  --surface-alt:#f1f5f9;
+  --surface-hover:#e2e8f0;
+  --border:#e2e8f0;
+  --text:#1e293b;
+  --text-soft:#475569;
+  --muted:#64748b;
+  --faint:#94a3b8;
+  --divider:#cbd5e1;
+  --accent:#4d96ff;
+  --accent-hover:#3b7de6;
+  --input-bg:#fff;
+  --error-text:#dc2626;
+  --error-bg:#fef2f2;
+  --error-border:#fecaca;
+  --shadow:0 10px 30px rgba(15,23,42,.18);
+  --chart-text:#666;
+  --chart-grid:rgba(0,0,0,0.1);
+  --chart-ink:#000;
+  --chart-daily:#2c3e50;
+  --chart-daily-fill:rgba(44,62,80,0.10);
+  --chart-monthly:#8e44ad;
+  --chart-study:#006400;
+  --chart-study-fill:rgba(0,100,0,0.2);
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f0f1a;
+  --surface:#1a1a2e;
+  --surface-alt:#23233a;
+  --surface-hover:#2c2c46;
+  --border:#2a2a40;
+  --text:#e2e8f0;
+  --text-soft:#cbd5e1;
+  --muted:#94a3b8;
+  --faint:#64748b;
+  --divider:#475569;
+  --input-bg:#0f0f1a;
+  --error-text:#f87171;
+  --error-bg:rgba(220,38,38,0.12);
+  --error-border:rgba(248,113,113,0.35);
+  --shadow:0 10px 30px rgba(0,0,0,.5);
+  --chart-text:#94a3b8;
+  --chart-grid:rgba(255,255,255,0.08);
+  --chart-ink:#e2e8f0;
+  --chart-daily:#a5b4cb;
+  --chart-daily-fill:rgba(165,180,203,0.12);
+  --chart-monthly:#b77fd6;
+  --chart-study:#22c55e;
+  --chart-study-fill:rgba(34,197,94,0.2);
+}
+
+.corner-tools{position:absolute;top:1rem;left:1rem;right:1rem;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:none}
+.corner-tools>*{pointer-events:auto}
+.theme-switch{display:flex;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:999px}
+/* Only the chosen theme shows; hovering (or tabbing in) slides the other two out to its left. */
+.theme-switch button{display:flex;align-items:center;justify-content:center;flex:none;width:0;height:28px;margin:0;padding:0;overflow:hidden;opacity:0;border:none;border-radius:999px;background:none;color:var(--muted);cursor:pointer;transition:width .2s ease,margin .2s ease,opacity .2s ease,background-color .15s,color .15s}
+.theme-switch button[aria-pressed="true"]{order:1;width:28px;opacity:1;background:var(--accent);color:#fff}
+.theme-switch:hover button,.theme-switch:has(:focus-visible) button{width:28px;opacity:1}
+.theme-switch:hover button:not([aria-pressed="true"]),.theme-switch:has(:focus-visible) button:not([aria-pressed="true"]){margin-right:2px}
+.theme-switch button:not([aria-pressed="true"]):hover{color:var(--text);background:var(--surface-alt)}
+.theme-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.theme-switch svg{width:15px;height:15px;flex:none}
+
+/* Meeting reminder: a calendar icon in the top-left corner; clicking it shows the next meeting. */
+.meeting-reminder{position:relative;order:-1}
+.reminder-btn{position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s}
+.reminder-btn svg{width:16px;height:16px}
+.reminder-btn:hover{color:var(--text)}
+.reminder-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.reminder-btn.has-meeting{color:var(--accent);border-color:var(--accent)}
+.reminder-btn.has-meeting::after{content:'';position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--surface)}
+.reminder-tip{position:absolute;top:calc(100% + 8px);left:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);color:var(--text);font-size:0.85rem;white-space:nowrap;visibility:hidden;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease,visibility 0s linear .15s}
+.meeting-reminder.open .reminder-tip{visibility:visible;opacity:1;transform:none;transition:opacity .15s ease,transform .15s ease,visibility 0s}
+.reminder-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.reminder-when{font-weight:700}
+.reminder-when:empty{display:none}
+.reminder-timer{margin-top:4px;font:bold 1.15rem 'Courier New',Courier,monospace;font-variant-numeric:tabular-nums;color:var(--accent)}
+.reminder-timer:empty,.reminder-countdown:empty{display:none}
+.reminder-countdown{color:var(--muted)}
+.reminder-link{margin-top:6px;color:var(--accent);font-size:0.8rem;font-weight:600;text-decoration:none}
+.reminder-link:hover{text-decoration:underline}
+
+@media (prefers-reduced-motion:reduce){
+  .theme-switch button,.reminder-tip{transition:none}
+}
+@media (max-width:640px){
+  .corner-tools{position:static;margin:-0.75rem 0 0.75rem}
+}

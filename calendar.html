@@ -58,6 +58,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .meeting-past{background:var(--surface-alt)}
 .meeting-past:hover{background:var(--past-hover)}
 .meeting-past .meeting-time{color:var(--muted)}
+.meeting-local{margin-top:-4px;font-size:0.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dots{display:flex;flex-wrap:wrap;gap:4px;margin-top:auto}
 #dotTip{position:fixed;z-index:1002;pointer-events:none;padding:6px 8px;background:rgba(0,0,0,0.8);border-radius:6px;color:#fff;font:bold 13px 'Courier New',Courier,monospace;white-space:nowrap}
 #dotTip[hidden]{display:none}
@@ -81,6 +82,8 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .meeting-form input[type=date]{flex:1 1 140px}
 .meeting-form input[type=time]{flex:1 1 90px}
 .meeting-unlock input{flex:1;min-width:0}
+.zone-hint{width:100%;font-size:0.8rem;color:var(--muted)}
+.zone-hint[hidden]{display:none}
 .form-buttons{display:flex;gap:8px;width:100%}
 .form-buttons .btn-primary{flex:1}
 .day-status{min-height:1.2em;margin-top:8px;font-size:0.85rem;color:var(--muted)}
@@ -96,6 +99,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
   .next-tag{display:none}
   .meeting-time{font-size:0.65rem}
   .meeting-time .clock{display:none}
+  .meeting-local{font-size:0.6rem;margin-top:-2px}
   .dots{gap:3px}
   .cell .dot{width:7px;height:7px}
 }

@@ -47,10 +47,10 @@ function renderReminder() {
   if (next) {
     const time = reminderMeetings[next];
     label.textContent = 'Next meeting';
-    when.textContent = formatDayTitle(next) + ' · ' + time;
+    when.textContent = formatMeetingWhen(next, time);
     timer.textContent = formatTimer(meetingTime(next, time) - Date.now());
     countdown.textContent = '';
-    button.setAttribute('aria-label', 'Next meeting: ' + formatDayTitle(next) + ' at ' + time + ', ' + meetingCountdown(next, time));
+    button.setAttribute('aria-label', 'Next meeting: ' + formatDayTitle(next) + ' at ' + formatMeetingClock(next, time) + ', ' + meetingCountdown(next, time));
   } else {
     label.textContent = 'No meeting set';
     when.textContent = '';

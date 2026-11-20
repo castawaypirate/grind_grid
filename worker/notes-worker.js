@@ -147,6 +147,9 @@ async function handleSave(request, env) {
   return json(request, 200, { ok: true });
 }
 
+// Thrown when the day a save targets changed on the server after the browser read it.
+class MeetingConflict extends Error {}
+
 async function handleMeetingSave(request, env) {
   let body;
   try {
@@ -155,16 +158,28 @@ async function handleMeetingSave(request, env) {
     return json(request, 400, { error: 'Invalid JSON' });
   }
 
-  const { date, time, from } = body || {};
+  // expected is the time the browser last saw on date ('' for none). Leaving it out skips that check (older pages).
+  const { date, time, from, expected } = body || {};
   if (!isRealDate(date)) return json(request, 400, { error: 'Invalid date' });
   if (from !== undefined && from !== null && !isRealDate(from)) return json(request, 400, { error: 'Invalid previous date' });
   if (typeof time !== 'string' || (time && !TIME_PATTERN.test(time))) return json(request, 400, { error: 'Invalid time' });
+  if (expected !== undefined && (typeof expected !== 'string' || (expected && !TIME_PATTERN.test(expected)))) {
+    return json(request, 400, { error: 'Invalid expected time' });
+  }
 
   const message = meetingMessage(date, time, from);
-  await updateJsonFile(env, 'meetings.json', message, meetings => {
-    const updated = applyMeeting(meetings, date, time, from);
-    return JSON.stringify(updated) === JSON.stringify(sortedByKey(meetings)) ? null : updated;
-  });
+  try {
+    await updateJsonFile(env, 'meetings.json', message, meetings => {
+      // Someone else changed this day since the browser loaded it, so don't overwrite their meeting.
+      if (expected !== undefined && (meetings[date] || '') !== expected) throw new MeetingConflict();
+      if (from && from !== date && meetings[date]) throw new MeetingConflict();
+      const updated = applyMeeting(meetings, date, time, from);
+      return JSON.stringify(updated) === JSON.stringify(sortedByKey(meetings)) ? null : updated;
+    });
+  } catch (err) {
+    if (err instanceof MeetingConflict) return json(request, 409, { error: 'Someone else changed the meeting on ' + date });
+    throw err;
+  }
   return json(request, 200, { ok: true });
 }
 

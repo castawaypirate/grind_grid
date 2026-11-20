@@ -1,6 +1,11 @@
 // Shared by index.html, challenge.html, 1440-shots.html and calendar.html. Needs theme.js.
 const DAY_MS = 86400000;
-const STORAGE_KEY = 'grindgrid.dateRange.v2';
+// v3: the end date can be 'latest'. Ranges saved under v2 had a fixed end date that stopped following new data.
+const STORAGE_KEY = 'grindgrid.dateRange.v3';
+// The group's time zone. Meeting times are wall-clock times there, whoever is viewing.
+// fetch-data.js has the same setting for deciding when a day is over.
+const GROUP_TIME_ZONE = 'Europe/Athens';
+const GROUP_TIME_ZONE_LABEL = 'Athens time';
 // The worker that saves notes and meetings (worker/notes-worker.js).
 const API_URL = 'https://grind-grid-notes.castawayfocuspirate-a34.workers.dev';
 const PASSCODE_KEY = 'grindgrid.notesPasscode';
@@ -91,9 +96,59 @@ function formatDayTitle(dateStr) {
   return d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }) + ' ' + formatChartLabel(d);
 }
 
-// Meeting times are the group's local wall-clock time, so they are read in the viewer's time zone.
+// How far ahead of UTC a time zone's clocks are at a moment, in ms.
+function zoneOffset(timeZone, ms) {
+  const parts = {};
+  const format = new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric'
+  });
+  for (const part of format.formatToParts(ms)) parts[part.type] = Number(part.value);
+  const wall = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return wall - Math.floor(ms / 1000) * 1000;
+}
+
+// The moment it is HH:MM on YYYY-MM-DD in a time zone.
+function zonedTime(dateStr, time, timeZone) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = time.split(':').map(Number);
+  const wall = Date.UTC(y, m - 1, d, hh, mm);
+  // The second pass corrects the offset when a daylight saving change falls between the guess and the answer.
+  const guess = wall - zoneOffset(timeZone, wall);
+  return wall - zoneOffset(timeZone, guess);
+}
+
+// A moment's date as YYYY-MM-DD in a time zone (undefined means the viewer's).
+function dateStrAt(ms, timeZone) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+}
+
+// Meeting times are the group's wall-clock time, so the same meeting is the same moment for every viewer.
 function meetingTime(dateStr, time) {
-  return new Date(dateStr + 'T' + time).getTime();
+  return zonedTime(dateStr, time, GROUP_TIME_ZONE);
+}
+
+function viewerInGroupZone(ms) {
+  return zoneOffset(GROUP_TIME_ZONE, ms) === -new Date(ms).getTimezoneOffset() * 60000;
+}
+
+// "19:42 your time" (with the weekday when it falls on another day there), or '' for viewers in the group's time zone.
+function meetingLocalNote(dateStr, time) {
+  const at = meetingTime(dateStr, time);
+  if (viewerInGroupZone(at)) return '';
+  const local = new Date(at);
+  const clock = local.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const day = dateStrAt(at) === dateStr ? '' : local.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ';
+  return day + clock + ' your time';
+}
+
+// "20:42", or "20:42 Athens time (19:42 your time)" for viewers elsewhere.
+function formatMeetingClock(dateStr, time) {
+  const note = meetingLocalNote(dateStr, time);
+  return note ? time + ' ' + GROUP_TIME_ZONE_LABEL + ' (' + note + ')' : time;
+}
+
+function formatMeetingWhen(dateStr, time) {
+  return formatDayTitle(dateStr) + ' · ' + formatMeetingClock(dateStr, time);
 }
 
 // meetings is { 'YYYY-MM-DD': 'HH:MM' }. Returns the date of the next meeting that hasn't started, or null.
@@ -101,17 +156,19 @@ function nextMeetingIn(meetings) {
   return Object.keys(meetings).sort().find(d => meetingTime(d, meetings[d]) >= Date.now()) || null;
 }
 
+// Days are counted on the viewer's calendar, so "tomorrow" means their tomorrow.
 function meetingCountdown(dateStr, time) {
-  const days = Math.round((utcDate(dateStr) - utcDate(todayStr())) / DAY_MS);
-  if (days === 0) return 'in ' + formatDuration(Math.max(1, (meetingTime(dateStr, time) - Date.now()) / 60000));
+  const at = meetingTime(dateStr, time);
+  const days = Math.round((utcDate(dateStrAt(at)) - utcDate(todayStr())) / DAY_MS);
+  if (days === 0) return 'in ' + formatDuration(Math.max(1, (at - Date.now()) / 60000));
   if (days === 1) return 'tomorrow';
   return 'in ' + days + ' days';
 }
 
-// Loads meetings once per page (the calendar and the reminder icon share it).
+// Loads meetings once per page (the calendar and the reminder icon share it); fresh asks the server again.
 // writable is false when only the static meetings.json could be read.
-function fetchMeetings() {
-  if (!meetingsRequest) {
+function fetchMeetings(fresh) {
+  if (!meetingsRequest || fresh) {
     meetingsRequest = (async () => {
       try {
         const meetings = await fetchJson(API_URL + '/meetings', { signal: AbortSignal.timeout(MEETINGS_LOAD_TIMEOUT_MS) });
@@ -145,10 +202,12 @@ function sliceWithPadding(arr, startIdx, endIdx) {
   return out;
 }
 
+// { from, to }: from is a date; to is a date, or 'latest' to keep following new data.
 function loadSavedRange() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved.from) && /^\d{4}-\d{2}-\d{2}$/.test(saved.to)) {
+    const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s);
+    if (saved && isDate(saved.from) && (saved.to === 'latest' || isDate(saved.to))) {
       return saved;
     }
   } catch (e) {}
@@ -270,14 +329,16 @@ async function initRangePage({ render, errorEl, onData }) {
     }
 
     // Future dates still stop at the latest available data point.
-    endIdx = Math.min(endIdx, jsonData.labels.length - 1);
+    const lastIdx = jsonData.labels.length - 1;
+    endIdx = Math.min(endIdx, lastIdx);
     startIdx = Math.min(startIdx, endIdx);
 
     fromInput.value = toDateStr(idxToDate(startIdx));
     toInput.value = toDateStr(idxToDate(endIdx));
 
-    // Only an explicit click saves, so visitors who never choose a range keep following new data.
-    if (save) saveRange(fromInput.value, toInput.value);
+    // Only an explicit click saves. A range that ends on the newest day is saved as 'latest',
+    // so it keeps growing as new days come in instead of freezing on the day it was saved.
+    if (save) saveRange(fromInput.value, endIdx === lastIdx ? 'latest' : toInput.value);
 
     draw(startIdx, endIdx);
   }
@@ -286,8 +347,9 @@ async function initRangePage({ render, errorEl, onData }) {
     await loadData();
 
     const lastIdx = jsonData.labels.length - 1;
-    const firstDate = toDateStr(DATA_START);
     const lastDate = toDateStr(idxToDate(lastIdx));
+    // By default: from the start of the newest day's year up to the newest day.
+    const defaultFrom = lastDate.slice(0, 4) + '-01-01';
 
     fromInput.max = lastDate;
     toInput.max = lastDate;
@@ -300,14 +362,14 @@ async function initRangePage({ render, errorEl, onData }) {
     if (onData) onData(lastIdx);
 
     const saved = loadSavedRange();
-    fromInput.value = saved ? saved.from : firstDate;
-    toInput.value = saved ? saved.to : lastDate;
+    fromInput.value = saved ? saved.from : defaultFrom;
+    toInput.value = saved && saved.to !== 'latest' ? saved.to : lastDate;
 
     applyRange({ save: false });
 
     document.getElementById('applyBtn').addEventListener('click', () => applyRange({ save: true }));
     document.getElementById('latestBtn').addEventListener('click', () => {
-      if (!fromInput.value) fromInput.value = firstDate;
+      if (!fromInput.value) fromInput.value = defaultFrom;
       toInput.value = lastDate;
       applyRange({ save: true });
     });

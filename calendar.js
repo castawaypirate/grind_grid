@@ -45,7 +45,7 @@ function renderHeader() {
 
   if (next) {
     const when = document.createElement('strong');
-    when.textContent = formatDayTitle(next) + ' · ' + meetings[next];
+    when.textContent = formatMeetingWhen(next, meetings[next]);
     line.replaceChildren('Next meeting: ', when, ' (' + meetingCountdown(next, meetings[next]) + ')');
   } else {
     line.textContent = 'No meeting set. Click a day to add one.';
@@ -104,7 +104,15 @@ function buildCell(dateStr, inMonth, today, next) {
     clock.textContent = '🕗 ';
     meeting.append(clock, time);
     cell.appendChild(meeting);
-    label += ', meeting at ' + time;
+    // Viewers outside the group's time zone also see when it is for them.
+    const note = meetingLocalNote(dateStr, time);
+    if (note) {
+      const local = document.createElement('div');
+      local.className = 'meeting-local';
+      local.textContent = note;
+      cell.appendChild(local);
+    }
+    label += ', meeting at ' + formatMeetingClock(dateStr, time);
   }
 
   if (jsonData) {
@@ -266,7 +274,11 @@ function getDayBoxEls() {
   deleteBtn.textContent = 'Delete';
   deleteBtn.addEventListener('click', deleteOpenMeeting);
   buttons.append(saveBtn, deleteBtn);
-  form.append(dateInput, timeInput, buttons);
+  const zoneHint = document.createElement('div');
+  zoneHint.className = 'zone-hint';
+  timeInput.addEventListener('input', showZoneHint);
+  dateInput.addEventListener('input', showZoneHint);
+  form.append(dateInput, timeInput, zoneHint, buttons);
   form.addEventListener('submit', submitMeeting);
 
   const unlock = document.createElement('form');
@@ -292,8 +304,19 @@ function getDayBoxEls() {
   box.append(head, hoursLabel, hours, noData, meetingLabel, meetingView, form, unlock, status);
   document.body.appendChild(box);
 
-  dayBoxEls = { box, title, close, hours, noData, meetingView, form, dateInput, timeInput, saveBtn, deleteBtn, unlock, passcode, status };
+  dayBoxEls = { box, title, close, hours, noData, meetingView, form, dateInput, timeInput, zoneHint, saveBtn, deleteBtn, unlock, passcode, status };
   return dayBoxEls;
+}
+
+// Times are entered in the group's time zone; viewers elsewhere see what that is for them.
+function showZoneHint() {
+  const { dateInput, timeInput, zoneHint } = getDayBoxEls();
+  const date = dateInput.value;
+  const time = timeInput.value;
+  const away = !viewerInGroupZone(date ? meetingTime(date, time || '12:00') : Date.now());
+  const note = away && date && time ? meetingLocalNote(date, time) : '';
+  zoneHint.hidden = !away;
+  zoneHint.textContent = away ? 'Time is ' + GROUP_TIME_ZONE_LABEL + (note ? ' (' + note + ')' : '') : '';
 }
 
 function canEditMeetings() {
@@ -332,11 +355,12 @@ function showDayState() {
   showDayHours();
 
   meetingView.hidden = editable;
-  meetingView.textContent = time ? '🕗 ' + time + (isUpcoming(openDay) ? '' : ' (past)') : 'No meeting';
+  meetingView.textContent = time ? '🕗 ' + formatMeetingClock(openDay, time) + (isUpcoming(openDay) ? '' : ' (past)') : 'No meeting';
 
   form.hidden = !editable;
   dateInput.value = openDay;
   timeInput.value = time || lastMeetingTime();
+  showZoneHint();
   saveBtn.textContent = time ? 'Save' : 'Add meeting';
   deleteBtn.hidden = !time;
 
@@ -388,7 +412,8 @@ function submitMeeting(event) {
     return;
   }
 
-  const change = { date, time };
+  // expected lets the server refuse the save if someone else has changed that day since we loaded it.
+  const change = { date, time, expected: meetings[date] || '' };
   if (date !== from && meetings[from]) change.from = from;
   closeDayBox();
   saveMeeting(change);
@@ -398,7 +423,7 @@ function submitMeeting(event) {
 function deleteOpenMeeting() {
   const date = openDay;
   closeDayBox();
-  saveMeeting({ date, time: '' });
+  saveMeeting({ date, time: '', expected: meetings[date] || '' });
 }
 
 function setMeeting(dateStr, time) {
@@ -427,8 +452,17 @@ function saveMeeting(change) {
         writeStorage(PASSCODE_KEY, null);
         throw new Error('wrong passcode');
       }
+      if (res.status === 409) throw new Error('conflict');
       if (!res.ok) throw new Error('server error');
     } catch (err) {
+      if (err.message === 'conflict') {
+        // Someone else changed that day first: show what the server has now instead of our version.
+        await loadMeetings(true);
+        renderAll();
+        if (openDay) showDayState();
+        showToast('Meeting not saved: someone else changed ' + formatDayTitle(change.date) + ' first. Showing the latest meetings.');
+        return;
+      }
       // Only undo if nobody changed these days again in the meantime.
       if (days.every((d, i) => (meetings[d] || '') === after[i])) {
         days.forEach((d, i) => setMeeting(d, before[i]));
@@ -441,8 +475,8 @@ function saveMeeting(change) {
   });
 }
 
-async function loadMeetings() {
-  const result = await fetchMeetings();
+async function loadMeetings(fresh) {
+  const result = await fetchMeetings(fresh);
   meetings = { ...result.meetings };
   meetingsWritable = result.writable;
 }

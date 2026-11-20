@@ -99,6 +99,7 @@ function getAchievement(total) {
 
 function render(startIdx, endIdx) {
   const users = jsonData.users;
+  setChallengeTitle(startIdx, endIdx);
 
   const rangeLabel = document.getElementById('rangeLabel');
   rangeLabel.textContent = formatRangeLabel(idxToDate(startIdx), idxToDate(endIdx))
@@ -148,17 +149,17 @@ function render(startIdx, endIdx) {
   });
 }
 
-function setChallengeTitle(lastIdx) {
-  const startYear = DATA_START.getUTCFullYear();
-  const endYear = idxToDate(lastIdx).getUTCFullYear();
+// The years of the range being shown, e.g. "2026 Challenge".
+function setChallengeTitle(startIdx, endIdx) {
+  const startYear = idxToDate(startIdx).getUTCFullYear();
+  const endYear = idxToDate(endIdx).getUTCFullYear();
   document.getElementById('h1Title').textContent = '🏆 ' +
     (startYear === endYear ? startYear : startYear + '–' + endYear) + ' Challenge';
 }
 
 document.addEventListener('DOMContentLoaded', () => initRangePage({
   render,
-  errorEl: document.getElementById('leaderboard'),
-  onData: setChallengeTitle
+  errorEl: document.getElementById('leaderboard')
 }));
 </script>
 </body>

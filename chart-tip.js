@@ -2,9 +2,10 @@
 // Needs common.js and notes.js. Use it as a Chart.js tooltip:
 //   tooltip: { mode: 'index', intersect: false, enabled: false, external: chartTipHandler(user, startIdx, rowsFor) }
 // rowsFor(date, index) returns the rows for that day, each
-//   { dataset, name, hours, goal, track }
+//   { dataset, name, hours, goal, track, total, totalLabel }
 // where dataset is the chart dataset the row stands for (its colour, and the row hides with it),
 // hours and goal are in hours, and track turns the percentage green with a ✓ once the goal is met.
+// total (hours) and totalLabel are optional: a small line under the row, e.g. "Week total 14h 33m".
 
 // Hours as a fixed-width "3h 05m", so the numbers line up.
 function formatHours(hours) {
@@ -42,7 +43,7 @@ function fillChartTip(tip, chart, date, rows, note) {
   if (note) title.appendChild(tipEl('span', 'tip-note-dot'));
 
   const grid = tipEl('div', 'tip-rows');
-  for (const { dataset, name, hours, goal, track } of rows) {
+  for (const { dataset, name, hours, goal, track, total, totalLabel } of rows) {
     if (!chart.isDatasetVisible(dataset)) continue;
     const met = track && hours >= goal;
     const pct = Math.round(hours / goal * 100) + '%' + (met ? ' ✓' : '');
@@ -56,6 +57,7 @@ function fillChartTip(tip, chart, date, rows, note) {
       tipEl('span', 'tip-num tip-goal', '/ ' + formatGoal(goal)),
       tipEl('span', 'tip-num tip-pct' + (met ? ' met' : ''), pct)
     );
+    if (total !== undefined) grid.appendChild(tipEl('span', 'tip-total', totalLabel + ' ' + formatHours(total)));
   }
 
   const parts = [title, grid];

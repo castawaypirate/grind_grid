@@ -10,6 +10,7 @@
 .tip-goal{color:var(--muted);text-align:left}
 .tip-pct{color:var(--muted)}
 .tip-pct.met{color:var(--success)}
+.tip-total{grid-column:2/-1;margin-top:-3px;color:var(--muted);font-size:0.72rem}
 .tip-note{margin-top:8px;padding:6px 8px;background:#fff9c4;border:1px solid #000;border-radius:4px;color:#000;font:bold 12px 'Courier New',Courier,monospace;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
 .tip-hint{margin-top:6px;color:var(--faint);font-size:0.7rem}
 .tip-hint:empty{display:none}

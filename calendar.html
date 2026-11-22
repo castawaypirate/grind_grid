@@ -87,6 +87,19 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .form-buttons{display:flex;gap:8px;width:100%}
 .form-buttons .btn-primary{flex:1}
 .day-status{min-height:1.2em;margin-top:8px;font-size:0.85rem;color:var(--muted)}
+#meetingsBox{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;width:400px;max-width:calc(100vw - 2rem);max-height:calc(100vh - 4rem);overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+#meetingsBox[hidden]{display:none}
+.meeting-list{list-style:none;margin:0 -8px 12px}
+.meeting-list[hidden],.meetings-box .section-label[hidden],.meetings-box .day-empty[hidden]{display:none}
+.meeting-list button{display:flex;align-items:baseline;gap:10px;width:100%;padding:7px 8px;border:none;border-radius:6px;background:none;color:var(--text);font:inherit;font-size:0.9rem;text-align:left;cursor:pointer}
+.meeting-list button:hover{background:var(--surface-alt)}
+.meeting-list button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.meeting-list .when{flex:1;min-width:0}
+.meeting-list .clock-time{font-weight:600}
+.meeting-list .side{flex:none;color:var(--muted);font-size:0.8rem;white-space:nowrap}
+.meeting-list .is-next .side{color:var(--accent);font-weight:700}
+.meeting-list .past{color:var(--muted)}
+.meeting-list .past .clock-time{font-weight:500}
 #toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:1001;max-width:calc(100vw - 2rem);padding:8px 14px;background:#7f1d1d;border-radius:6px;color:#fff;font:bold 13px 'Courier New',Courier,monospace}
 #toast[hidden]{display:none}
 @media (max-width:640px){
@@ -122,7 +135,10 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
     <button class="btn btn-secondary btn-arrow" id="nextMonth" aria-label="Next month">›</button>
   </div>
   <h2 id="todayTitle"></h2>
-  <button class="btn btn-primary" id="nextMeetingBtn">Next meeting →</button>
+  <div class="toolbar-group">
+    <button class="btn btn-secondary" id="allMeetingsBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="meetingsBox">All meetings</button>
+    <button class="btn btn-primary" id="nextMeetingBtn">Next meeting →</button>
+  </div>
 </div>
 
 <div class="legend" id="legend"></div>

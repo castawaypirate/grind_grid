@@ -23,7 +23,11 @@
   --chart-ink:#000;
   --chart-daily:#2c3e50;
   --chart-daily-fill:rgba(44,62,80,0.10);
+  --chart-weekly:#27ae60;
   --chart-monthly:#8e44ad;
+  --chart-monthly-goal:#d4a017;
+  --chart-free:#999;
+  --chart-free-fill:rgba(153,153,153,0.2);
   --chart-study:#006400;
   --chart-study-fill:rgba(0,100,0,0.2);
   --success:#15803d;
@@ -50,7 +54,11 @@
   --chart-ink:#e2e8f0;
   --chart-daily:#a5b4cb;
   --chart-daily-fill:rgba(165,180,203,0.12);
+  --chart-weekly:#4ade80;
   --chart-monthly:#b77fd6;
+  --chart-monthly-goal:#ffd700;
+  --chart-free:#7c8499;
+  --chart-free-fill:rgba(124,132,153,0.18);
   --chart-study:#22c55e;
   --chart-study-fill:rgba(34,197,94,0.2);
   --success:#4ade80;

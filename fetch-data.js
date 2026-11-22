@@ -16,7 +16,8 @@ const USERS = [
   { username: 'jimmy_hawkins', displayName: 'Jimmy_hawkins' }
 ];
 
-const GOALS = { daily: 5, weekly: 35, monthly: 150 };
+// Hours a day. The pages make the weekly goal 7 days of it and each month's goal that month's days of it.
+const GOALS = { daily: 5 };
 
 // The group's time zone (common.js has the same setting). data.json stops at the last day that is over there,
 // so the charts never end on a half-logged day; that day is picked up by the next run.
@@ -54,14 +55,6 @@ async function fetchUserDataWithRetry(username) {
   }
 }
 
-function getISOWeekKey(dt) {
-  const d = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const ys = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const wn = Math.ceil((((d - ys) / 86400000) + 1) / 7);
-  return d.getUTCFullYear() + '-W' + String(wn).padStart(2, '0');
-}
-
 function processHabit(username, displayName, habit, globalStart, globalEnd) {
   const hm = habit.heatmap || [];
   const map = {};
@@ -69,37 +62,15 @@ function processHabit(username, displayName, habit, globalStart, globalEnd) {
     map[e.day] = (e.value || 0) / 60;
   }
 
-  const filled = [];
+  // The pages work out the weekly and monthly running totals from daily (index.html).
+  const daily = [];
   const cur = new Date(globalStart);
   while (cur <= globalEnd) {
-    const key = cur.toISOString().slice(0, 10);
-    filled.push({ date: new Date(cur), hours: map[key] || 0 });
+    daily.push(+(map[cur.toISOString().slice(0, 10)] || 0).toFixed(2));
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
 
-  const daily = filled.map(f => +f.hours.toFixed(2));
-
-  const wStats = {}, mStats = {};
-  for (const f of filled) {
-    const wk = getISOWeekKey(f.date);
-    if (!wStats[wk]) wStats[wk] = { hours: 0 };
-    wStats[wk].hours += f.hours;
-    const mk = f.date.getUTCFullYear() + '-' + String(f.date.getUTCMonth() + 1).padStart(2, '0');
-    if (!mStats[mk]) mStats[mk] = { hours: 0 };
-    mStats[mk].hours += f.hours;
-  }
-
-  const weeklyLine = filled.map(f => {
-    const wk = getISOWeekKey(f.date);
-    return +(wStats[wk]?.hours || 0).toFixed(2);
-  });
-
-  const monthlyLine = filled.map(f => {
-    const mk = f.date.getUTCFullYear() + '-' + String(f.date.getUTCMonth() + 1).padStart(2, '0');
-    return +(mStats[mk]?.hours || 0).toFixed(2);
-  });
-
-  return { username, displayName, habitTitle: habit.title.trim(), daily, weeklyLine, monthlyLine };
+  return { username, displayName, habitTitle: habit.title.trim(), daily };
 }
 
 async function main() {

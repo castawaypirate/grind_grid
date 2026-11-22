@@ -92,8 +92,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
           ...themed({ borderColor: '--chart-weekly' }),
           backgroundColor: 'rgba(39,174,96,0.06)',
           fill: false,
-          // Monotone, so the drop back to zero each Monday doesn't swing below it.
-          cubicInterpolationMode: 'monotone',
+          tension: 0.12,
           pointRadius: 0
         },
         {
@@ -111,7 +110,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
           ...themed({ borderColor: '--chart-monthly' }),
           backgroundColor: 'rgba(142,68,173,0.06)',
           fill: false,
-          cubicInterpolationMode: 'monotone',
+          tension: 0.12,
           pointRadius: 0
         },
         {
@@ -135,8 +134,15 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
           enabled: false,
           external: chartTipHandler(user, startIdx, (date, i) => [
             { dataset: 0, name: 'Daily', hours: data.daily[i], goal: goals.daily, track: true },
-            { dataset: 2, name: 'Week ' + isoWeek(date), hours: data.weeklyLine[i], goal: goals.weekly, track: true },
-            { dataset: 4, name: date.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' }), hours: data.monthlyLine[i], goal: goals.monthly, track: true }
+            // The lines show each week's and month's total; the label shows how far along that day was.
+            {
+              dataset: 2, name: 'Week ' + isoWeek(date), hours: data.weekSoFar[i], goal: goals.weekly, track: true,
+              total: data.weeklyLine[i], totalLabel: data.weekDone[i] ? 'Week total' : 'Week total so far'
+            },
+            {
+              dataset: 4, name: date.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' }), hours: data.monthSoFar[i], goal: goals.monthly, track: true,
+              total: data.monthlyLine[i], totalLabel: data.monthDone[i] ? 'Month total' : 'Month total so far'
+            }
           ])
         },
         legend: {
@@ -160,24 +166,33 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
   renderLegend(chart, legendEl);
 }
 
-// Each day's hours so far in its week (from Monday) and its month (from the 1st), that day included.
-// Worked out over all the data, so a range starting mid-week still counts the days before it.
-function runningTotals(daily) {
-  const weekly = [];
-  const monthly = [];
-  let week = 0;
-  let month = 0;
+// For one period length (weeks from Monday, or months from the 1st), per day:
+//   soFar: the period's hours up to and including that day
+//   total: the period's whole total (what the chart line shows), so far for the period still running
+//   done:  whether that period has ended
+// Worked out over all the data, so a range starting mid-period still counts the days before it.
+function periodTotals(daily, startsPeriod) {
+  const last = daily.length - 1;
+  const soFar = [];
+  let sum = 0;
   daily.forEach((hours, i) => {
-    const d = idxToDate(i);
-    if (d.getUTCDay() === 1) week = 0;
-    if (d.getUTCDate() === 1) month = 0;
-    week += hours;
-    month += hours;
-    weekly.push(+week.toFixed(2));
-    monthly.push(+month.toFixed(2));
+    if (startsPeriod(idxToDate(i))) sum = 0;
+    sum += hours;
+    soFar.push(+sum.toFixed(2));
   });
-  return { weekly, monthly };
+  // Each period's last day holds its total; walk back to give it to the period's other days.
+  const total = [];
+  const done = [];
+  for (let i = last; i >= 0; i--) {
+    const endsPeriod = i === last || startsPeriod(idxToDate(i + 1));
+    total[i] = endsPeriod ? soFar[i] : total[i + 1];
+    done[i] = endsPeriod ? startsPeriod(idxToDate(i + 1)) : done[i + 1];
+  }
+  return { soFar, total, done };
 }
+
+const startsWeek = d => d.getUTCDay() === 1;
+const startsMonth = d => d.getUTCDate() === 1;
 
 function render(startIdx, endIdx) {
   const users = jsonData.users;
@@ -215,11 +230,17 @@ function render(startIdx, endIdx) {
     wrapper.appendChild(box);
     container.appendChild(wrapper);
 
-    const totals = runningTotals(user.daily);
+    const week = periodTotals(user.daily, startsWeek);
+    const month = periodTotals(user.daily, startsMonth);
+    const slice = arr => sliceWithPadding(arr, startIdx, endIdx);
     renderChart(canvas, labels, {
-      daily: sliceWithPadding(user.daily, startIdx, endIdx),
-      weeklyLine: sliceWithPadding(totals.weekly, startIdx, endIdx),
-      monthlyLine: sliceWithPadding(totals.monthly, startIdx, endIdx)
+      daily: slice(user.daily),
+      weeklyLine: slice(week.total),
+      monthlyLine: slice(month.total),
+      weekSoFar: slice(week.soFar),
+      monthSoFar: slice(month.soFar),
+      weekDone: slice(week.done),
+      monthDone: slice(month.done)
     }, goals, legend, user, startIdx);
   }
 }

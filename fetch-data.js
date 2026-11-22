@@ -16,7 +16,8 @@ const USERS = [
   { username: 'jimmy_hawkins', displayName: 'Jimmy_hawkins' }
 ];
 
-const GOALS = { daily: 5, weekly: 35, monthly: 150 };
+// Hours a day. The pages make the weekly goal 7 days of it and each month's goal that month's days of it.
+const GOALS = { daily: 5 };
 
 // The group's time zone (common.js has the same setting). data.json stops at the last day that is over there,
 // so the charts never end on a half-logged day; that day is picked up by the next run.

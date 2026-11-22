@@ -63,7 +63,14 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 <script src="notes.js"></script>
 <script src="chart-tip.js"></script>
 <script>
+function daysInMonth(d) {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+}
+
 function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
+  // Only the daily goal is set (data.json); the week's and each month's goal are that many hours a day.
+  const weeklyGoal = goals.daily * 7;
+  const monthlyGoal = labels.map((_, i) => goals.daily * daysInMonth(idxToDate(startIdx + i)));
   const chart = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: {
@@ -96,8 +103,8 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
           pointRadius: 0
         },
         {
-          label: 'Weekly Goal (' + goals.weekly + 'h)',
-          data: new Array(labels.length).fill(goals.weekly),
+          label: 'Weekly Goal (' + weeklyGoal + 'h)',
+          data: new Array(labels.length).fill(weeklyGoal),
           ...themed({ borderColor: '--chart-ink' }),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
@@ -114,13 +121,14 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
           pointRadius: 0
         },
         {
-          label: 'Monthly Goal (' + goals.monthly + 'h)',
-          data: new Array(labels.length).fill(goals.monthly),
+          label: 'Monthly Goal (' + goals.daily + 'h × days)',
+          data: monthlyGoal,
           ...themed({ borderColor: '--chart-monthly-goal' }),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
           pointRadius: 0,
-          tension: 0
+          // Steps up or down on the 1st, rather than sloping across the month's last day.
+          stepped: true
         }
       ]
     },
@@ -136,11 +144,11 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
             { dataset: 0, name: 'Daily', hours: data.daily[i], goal: goals.daily, track: true },
             // The lines show each week's and month's total; the label shows how far along that day was.
             {
-              dataset: 2, name: 'Week ' + isoWeek(date), hours: data.weekSoFar[i], goal: goals.weekly, track: true,
+              dataset: 2, name: 'Week ' + isoWeek(date), hours: data.weekSoFar[i], goal: weeklyGoal, track: true,
               total: data.weeklyLine[i], totalLabel: data.weekDone[i] ? 'Week total' : 'Week total so far'
             },
             {
-              dataset: 4, name: date.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' }), hours: data.monthSoFar[i], goal: goals.monthly, track: true,
+              dataset: 4, name: date.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' }), hours: data.monthSoFar[i], goal: monthlyGoal[i], track: true,
               total: data.monthlyLine[i], totalLabel: data.monthDone[i] ? 'Month total' : 'Month total so far'
             }
           ])

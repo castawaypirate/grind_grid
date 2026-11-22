@@ -8,6 +8,7 @@ let meetingSaveQueue = Promise.resolve();
 let view = null;
 let openDay = null;
 let dayBoxEls = null;
+let meetingsBoxEls = null;
 let renderedFor = '';
 
 function userColor(i) {
@@ -171,6 +172,7 @@ function renderCalendar() {
 function renderAll() {
   renderHeader();
   renderCalendar();
+  renderMeetingsList();
 }
 
 function showMonth(dateStr) {
@@ -212,6 +214,122 @@ function showDotTip(dot) {
 function hideDotTip() {
   const tip = document.getElementById('dotTip');
   if (tip) tip.hidden = true;
+}
+
+// --- All meetings popup ---
+
+function getMeetingsBoxEls() {
+  if (meetingsBoxEls) return meetingsBoxEls;
+
+  const box = document.createElement('div');
+  box.id = 'meetingsBox';
+  box.className = 'meetings-box';
+  box.hidden = true;
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-labelledby', 'meetingsTitle');
+
+  const head = document.createElement('div');
+  head.className = 'day-box-head';
+  const title = document.createElement('div');
+  title.className = 'day-title';
+  title.id = 'meetingsTitle';
+  title.textContent = 'All meetings';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'day-close';
+  close.setAttribute('aria-label', 'Close');
+  close.textContent = '×';
+  close.addEventListener('click', () => closeMeetingsBox(true));
+  head.append(title, close);
+
+  const section = text => {
+    const label = document.createElement('div');
+    label.className = 'section-label';
+    label.textContent = text;
+    const list = document.createElement('ul');
+    list.className = 'meeting-list';
+    return [label, list];
+  };
+  const [upcomingLabel, upcoming] = section('Upcoming');
+  const [pastLabel, past] = section('Past');
+  const empty = document.createElement('div');
+  empty.className = 'day-empty';
+  empty.textContent = 'No meetings yet. Click a day on the calendar to add one.';
+
+  box.append(head, upcomingLabel, upcoming, pastLabel, past, empty);
+  document.body.appendChild(box);
+
+  meetingsBoxEls = { box, close, upcomingLabel, upcoming, pastLabel, past, empty };
+  return meetingsBoxEls;
+}
+
+// One meeting: its day and time, and how long until it (upcoming only). Clicking it opens that day.
+function meetingRow(dateStr, next) {
+  const time = meetings[dateStr];
+  const upcoming = isUpcoming(dateStr);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  if (!upcoming) button.classList.add('past');
+  if (dateStr === next) button.classList.add('is-next');
+
+  const when = document.createElement('span');
+  when.className = 'when';
+  const clock = document.createElement('span');
+  clock.className = 'clock-time';
+  clock.textContent = formatMeetingClock(dateStr, time);
+  when.append(formatDayTitle(dateStr) + ' · ', clock);
+
+  const side = document.createElement('span');
+  side.className = 'side';
+  side.textContent = !upcoming ? '' : dateStr === next ? 'Next · ' + meetingCountdown(dateStr, time) : meetingCountdown(dateStr, time);
+
+  button.append(when, side);
+  button.setAttribute('aria-label', formatMeetingWhen(dateStr, time) + (upcoming ? ', ' + meetingCountdown(dateStr, time) : ', past'));
+  button.addEventListener('click', () => {
+    closeMeetingsBox(false);
+    showMonth(dateStr);
+    openDayBox(dateStr);
+  });
+
+  const item = document.createElement('li');
+  item.appendChild(button);
+  return item;
+}
+
+// Upcoming meetings soonest first, then past ones most recent first. Only redrawn while the popup is open.
+function renderMeetingsList() {
+  if (!meetingsBoxEls || meetingsBoxEls.box.hidden) return;
+  const { upcomingLabel, upcoming, pastLabel, past, empty } = meetingsBoxEls;
+  const dates = Object.keys(meetings).sort();
+  const next = nextMeetingDate();
+  const coming = dates.filter(isUpcoming);
+  const gone = dates.filter(d => !isUpcoming(d)).reverse();
+
+  upcoming.replaceChildren(...coming.map(d => meetingRow(d, next)));
+  past.replaceChildren(...gone.map(d => meetingRow(d, next)));
+  upcomingLabel.hidden = upcoming.hidden = !coming.length;
+  pastLabel.hidden = past.hidden = !gone.length;
+  empty.hidden = dates.length > 0;
+}
+
+function openMeetingsBox() {
+  closeDayBox();
+  hideDotTip();
+  const { box, close } = getMeetingsBoxEls();
+  box.hidden = false;
+  document.getElementById('allMeetingsBtn').setAttribute('aria-expanded', 'true');
+  renderMeetingsList();
+  close.focus();
+}
+
+// restoreFocus puts focus back on the button that opened it (closing with × or Escape).
+function closeMeetingsBox(restoreFocus) {
+  if (!meetingsBoxEls || meetingsBoxEls.box.hidden) return;
+  meetingsBoxEls.box.hidden = true;
+  const button = document.getElementById('allMeetingsBtn');
+  button.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) button.focus();
 }
 
 // --- Day popup ---
@@ -498,6 +616,7 @@ function openLinkedMeeting() {
 // Keeps "in 2h 10 min", today's highlight and the next meeting current while the page stays open.
 function refresh() {
   renderHeader();
+  renderMeetingsList();
   if (todayStr() + '|' + nextMeetingDate() !== renderedFor) renderCalendar();
 }
 
@@ -509,6 +628,11 @@ function initCalendar() {
   document.getElementById('nextMonth').addEventListener('click', () => moveMonth(1));
   document.getElementById('todayBtn').addEventListener('click', () => showMonth(todayStr()));
   document.getElementById('nextMeetingBtn').addEventListener('click', openNextMeeting);
+  const allMeetingsBtn = document.getElementById('allMeetingsBtn');
+  allMeetingsBtn.addEventListener('click', () => {
+    if (meetingsBoxEls && !meetingsBoxEls.box.hidden) closeMeetingsBox(false);
+    else openMeetingsBox();
+  });
   window.addEventListener('hashchange', openLinkedMeeting);
 
   const grid = document.getElementById('grid');
@@ -532,9 +656,14 @@ function initCalendar() {
 
   document.addEventListener('mousedown', event => {
     if (openDay && !getDayBoxEls().box.contains(event.target)) closeDayBox();
+    // The button toggles the list itself, so a press on it doesn't count as outside.
+    if (meetingsBoxEls && !meetingsBoxEls.box.contains(event.target) && !allMeetingsBtn.contains(event.target)) closeMeetingsBox(false);
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') closeDayBox();
+    if (event.key === 'Escape') {
+      closeDayBox();
+      closeMeetingsBox(true);
+    }
   });
   window.addEventListener('scroll', hideDotTip, { passive: true });
 

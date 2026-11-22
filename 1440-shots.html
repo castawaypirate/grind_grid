@@ -89,8 +89,7 @@ function renderChart(canvas, labels, dailyHours, goalMins, legendEl, user, start
         {
           label: 'Free',
           data: remainingMins,
-          borderColor: '#999999',
-          backgroundColor: '#99999933',
+          ...themed({ borderColor: '--chart-free', backgroundColor: '--chart-free-fill' }),
           fill: true,
           tension: 0.3,
           pointRadius: 4,

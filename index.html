@@ -89,7 +89,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Weekly Hours',
           data: data.weeklyLine,
-          borderColor: '#27ae60',
+          ...themed({ borderColor: '--chart-weekly' }),
           backgroundColor: 'rgba(39,174,96,0.06)',
           fill: false,
           tension: 0.12,
@@ -116,7 +116,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Monthly Goal (' + goals.monthly + 'h)',
           data: new Array(labels.length).fill(goals.monthly),
-          borderColor: 'gold',
+          ...themed({ borderColor: '--chart-monthly-goal' }),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
           pointRadius: 0,

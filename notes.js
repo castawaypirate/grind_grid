@@ -64,14 +64,14 @@ async function loadNotes() {
   if (openNote) showNoteState();
 }
 
-// Spread into a chart's first dataset: days with a note get a larger amber dot.
-function noteDotOptions(username, startIdx, baseRadius, baseHoverRadius, baseColor) {
+// Spread into a chart's first dataset: days with a note get a larger amber dot; the rest take the dataset's fill color.
+function noteDotOptions(username, startIdx, baseRadius, baseHoverRadius) {
   const hasNote = ctx => !!noteFor(username, toDateStr(idxToDate(startIdx + ctx.dataIndex)));
   const noteRadius = Math.max(baseRadius + 3, 5);
   return {
     pointRadius: ctx => hasNote(ctx) ? noteRadius : baseRadius,
     pointHoverRadius: ctx => hasNote(ctx) ? noteRadius + 1 : baseHoverRadius,
-    pointBackgroundColor: ctx => hasNote(ctx) ? NOTE_DOT_COLOR : baseColor
+    pointBackgroundColor: ctx => hasNote(ctx) ? NOTE_DOT_COLOR : ctx.dataset.backgroundColor
   };
 }
 

@@ -7,13 +7,12 @@ const THEME_MODES = [
 ];
 const themeQuery = window.matchMedia('(prefers-color-scheme: dark)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-// How long a theme change fades, and how long the switch's highlight takes to slide; theme.css uses the same .4s and .25s.
+// How long a theme change fades; theme.css uses the same .4s.
 const THEME_FADE_MS = 400;
-const SWITCH_SLIDE_MS = 250;
 const themeListeners = [];
 let themeFadeTimer = null;
-let pendingThemeChange = null;
-let themeTransition = null;
+// The running crossfade (a view transition), if any.
+let themeFade = null;
 
 function themeMode() {
   let mode = null;
@@ -57,14 +56,20 @@ function applyTheme() {
 // crossfades, charts included; elsewhere only the CSS colors fade. The switch animates on its own either way.
 function changeTheme() {
   const root = document.documentElement;
-  if (root.dataset.theme === currentTheme() || reducedMotion.matches || document.visibilityState !== 'visible') {
+  if (themeFade) {
+    // Starting another fade would cut this one short with a jump; follow on from it instead.
+    themeFade.finished.finally(changeTheme);
+  } else if (root.dataset.theme === currentTheme() || reducedMotion.matches || document.visibilityState !== 'visible') {
     applyTheme();
   } else if (document.startViewTransition) {
-    const transition = themeTransition = document.startViewTransition(applyTheme);
-    transition.finished.finally(() => {
-      if (themeTransition !== transition) return;
-      themeTransition = null;
-      document.dispatchEvent(new Event('themefadeend'));
+    // During the fade the browser sends every pointer event to the page root, so an open switch would lose its hover
+    // and fold shut under a still pointer. .open holds it until the pointer moves after the fades, when hover is real again.
+    document.querySelectorAll('.theme-switch').forEach(group => {
+      if (group.matches(':hover')) group.classList.add('open');
+    });
+    themeFade = document.startViewTransition(applyTheme);
+    themeFade.finished.finally(() => {
+      themeFade = null;
     });
   } else {
     root.classList.add('theme-fading');
@@ -74,16 +79,28 @@ function changeTheme() {
   }
 }
 
-// The switch answers at once: its highlight slides to the new choice. The page fades after the slide, so the chart
-// redraws behind the fade can't make the slide stutter. Quick repeated clicks only fade the page once, to the last choice.
+// The switch's highlight slides to the new choice while the page fades to it.
 function setThemeMode(mode) {
   try {
     localStorage.setItem(THEME_KEY, mode);
   } catch (e) {}
   updateThemeSwitch();
-  clearTimeout(pendingThemeChange);
-  pendingThemeChange = setTimeout(changeTheme, reducedMotion.matches ? 0 : SWITCH_SLIDE_MS);
+  changeTheme();
 }
+
+document.addEventListener('pointermove', () => {
+  if (!themeFade) document.querySelectorAll('.theme-switch.open').forEach(group => group.classList.remove('open'));
+});
+
+// Clicks during the fade land on the page root too; hand one that hit a switch button over to that button.
+document.addEventListener('click', event => {
+  if (!themeFade || event.target.closest?.('.theme-switch')) return;
+  const button = [...document.querySelectorAll('.theme-switch button')].find(b => {
+    const r = b.getBoundingClientRect();
+    return r.width > 0 && event.clientX >= r.left && event.clientX < r.right && event.clientY >= r.top && event.clientY < r.bottom;
+  });
+  if (button) button.click();
+});
 
 // The bar across the top of every page: the meeting reminder (left) and the theme switch (right).
 function cornerTools() {
@@ -108,40 +125,6 @@ function settleThemeSwitch(group) {
   updateThemeSwitch();
 }
 
-// The browser forgets the hover while the page fades, which would fold the switch shut under a still pointer.
-// .open keeps it open until the pointer really moves off it, or focus leaves it. During the fade every pointer
-// event lands on the page root, so the switch remembers where the pointer went and checks once the fade is over.
-function keepSwitchOpen(group) {
-  if (group.classList.contains('open')) return;
-  group.classList.add('open');
-  let lastPoint = null;
-  const close = () => {
-    group.classList.remove('open');
-    document.removeEventListener('pointermove', onPointer);
-    document.removeEventListener('pointerdown', onPointer);
-    document.removeEventListener('themefadeend', onFadeEnd);
-    group.removeEventListener('focusout', onFocusOut);
-    settleThemeSwitch(group);
-  };
-  const onPointer = event => {
-    lastPoint = [event.clientX, event.clientY];
-    if (!themeTransition && !group.contains(event.target)) close();
-  };
-  const onFadeEnd = () => {
-    if (!lastPoint) return;
-    const r = group.getBoundingClientRect();
-    const [x, y] = lastPoint;
-    if (x < r.left || x > r.right || y < r.top || y > r.bottom) close();
-  };
-  const onFocusOut = event => {
-    if (!group.contains(event.relatedTarget)) close();
-  };
-  document.addEventListener('pointermove', onPointer);
-  document.addEventListener('pointerdown', onPointer);
-  document.addEventListener('themefadeend', onFadeEnd);
-  group.addEventListener('focusout', onFocusOut);
-}
-
 function buildThemeSwitch() {
   const group = document.createElement('div');
   group.className = 'theme-switch';
@@ -160,10 +143,7 @@ function buildThemeSwitch() {
     button.title = label;
     button.setAttribute('aria-label', label);
     button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + '</svg>';
-    button.addEventListener('click', () => {
-      keepSwitchOpen(group);
-      setThemeMode(mode);
-    });
+    button.addEventListener('click', () => setThemeMode(mode));
     group.appendChild(button);
   }
 

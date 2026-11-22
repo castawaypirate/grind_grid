@@ -92,7 +92,8 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
           ...themed({ borderColor: '--chart-weekly' }),
           backgroundColor: 'rgba(39,174,96,0.06)',
           fill: false,
-          tension: 0.12,
+          // Monotone, so the drop back to zero each Monday doesn't swing below it.
+          cubicInterpolationMode: 'monotone',
           pointRadius: 0
         },
         {
@@ -110,7 +111,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
           ...themed({ borderColor: '--chart-monthly' }),
           backgroundColor: 'rgba(142,68,173,0.06)',
           fill: false,
-          tension: 0.12,
+          cubicInterpolationMode: 'monotone',
           pointRadius: 0
         },
         {
@@ -159,6 +160,25 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
   renderLegend(chart, legendEl);
 }
 
+// Each day's hours so far in its week (from Monday) and its month (from the 1st), that day included.
+// Worked out over all the data, so a range starting mid-week still counts the days before it.
+function runningTotals(daily) {
+  const weekly = [];
+  const monthly = [];
+  let week = 0;
+  let month = 0;
+  daily.forEach((hours, i) => {
+    const d = idxToDate(i);
+    if (d.getUTCDay() === 1) week = 0;
+    if (d.getUTCDate() === 1) month = 0;
+    week += hours;
+    month += hours;
+    weekly.push(+week.toFixed(2));
+    monthly.push(+month.toFixed(2));
+  });
+  return { weekly, monthly };
+}
+
 function render(startIdx, endIdx) {
   const users = jsonData.users;
   const goals = jsonData.goals;
@@ -195,10 +215,11 @@ function render(startIdx, endIdx) {
     wrapper.appendChild(box);
     container.appendChild(wrapper);
 
+    const totals = runningTotals(user.daily);
     renderChart(canvas, labels, {
       daily: sliceWithPadding(user.daily, startIdx, endIdx),
-      weeklyLine: sliceWithPadding(user.weeklyLine, startIdx, endIdx),
-      monthlyLine: sliceWithPadding(user.monthlyLine, startIdx, endIdx)
+      weeklyLine: sliceWithPadding(totals.weekly, startIdx, endIdx),
+      monthlyLine: sliceWithPadding(totals.monthly, startIdx, endIdx)
     }, goals, legend, user, startIdx);
   }
 }

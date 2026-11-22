@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="theme.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="notes.css">
+<link rel="stylesheet" href="chart-tip.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:2rem 1rem}
@@ -28,7 +29,8 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .range-label{text-align:center;color:var(--muted);font-size:0.85rem;margin-bottom:1rem}
 .chart-wrapper{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:2rem}
 .chart-title{font-size:1.1rem;font-weight:600;margin-bottom:1rem;text-transform:capitalize}
-.chart-wrapper canvas{width:100%!important;height:450px!important}
+/* Chart.js sizes the chart to this box, so it must hold only the canvas. */
+.chart-box{position:relative;height:450px}
 .chart-legend{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 8px;margin-bottom:12px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
 .chart-legend label{display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border-radius:6px;font-size:11px;color:var(--text-soft);cursor:pointer;user-select:none;white-space:nowrap;transition:opacity .15s,background .15s}
 .chart-legend label:hover{background:var(--surface-alt)}
@@ -64,6 +66,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 <script src="common.js"></script>
 <script src="reminder.js"></script>
 <script src="notes.js"></script>
+<script src="chart-tip.js"></script>
 <script>
 function renderChart(canvas, labels, dailyHours, goalMins, legendEl, user, startIdx) {
   const dailyMins = dailyHours.map(h => +(h * 60).toFixed(1));
@@ -78,11 +81,10 @@ function renderChart(canvas, labels, dailyHours, goalMins, legendEl, user, start
         {
           label: 'Study',
           data: dailyMins,
-          borderColor: cssVar('--chart-study'),
-          backgroundColor: cssVar('--chart-study-fill'),
+          ...themed({ borderColor: '--chart-study', backgroundColor: '--chart-study-fill' }),
           fill: true,
           tension: 0.3,
-          ...noteDotOptions(user.username, startIdx, 4, 6, cssVar('--chart-study-fill'))
+          ...noteDotOptions(user.username, startIdx, 4, 6)
         },
         {
           label: 'Free',
@@ -97,7 +99,7 @@ function renderChart(canvas, labels, dailyHours, goalMins, legendEl, user, start
         {
           label: 'Goal (' + formatDuration(goalMins) + ')',
           data: goalLine,
-          borderColor: cssVar('--chart-ink'),
+          ...themed({ borderColor: '--chart-ink' }),
           borderDash: [5, 5],
           fill: false,
           tension: 0,
@@ -117,14 +119,11 @@ function renderChart(canvas, labels, dailyHours, goalMins, legendEl, user, start
         tooltip: {
           mode: 'index',
           intersect: false,
-          titleFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
-          bodyFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
-          footerFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
-          callbacks: {
-            label: function(ctx) {
-              return ctx.dataset.label + ': ' + formatDuration(ctx.parsed.y);
-            }
-          }
+          enabled: false,
+          external: chartTipHandler(user, startIdx, (date, i) => [
+            { dataset: 0, name: 'Study', hours: dailyMins[i] / 60, goal: goalMins / 60, track: true },
+            { dataset: 1, name: 'Free', hours: remainingMins[i] / 60, goal: 24, track: false }
+          ])
         }
       },
       scales: {
@@ -175,8 +174,11 @@ function render(startIdx, endIdx) {
     legend.className = 'chart-legend';
     wrapper.appendChild(legend);
 
+    const box = document.createElement('div');
+    box.className = 'chart-box';
     const canvas = document.createElement('canvas');
-    wrapper.appendChild(canvas);
+    box.appendChild(canvas);
+    wrapper.appendChild(box);
     container.appendChild(wrapper);
 
     renderChart(canvas, labels, sliceWithPadding(user.daily, startIdx, endIdx), goalMins, legend, user, startIdx);

@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="theme.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="notes.css">
+<link rel="stylesheet" href="chart-tip.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:2rem 1rem}
@@ -17,7 +18,8 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 .subtitle{text-align:center;color:var(--muted);margin-bottom:2rem;font-size:0.9rem}
 .chart-wrapper{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:2rem}
 .chart-title{font-size:1.1rem;font-weight:600;margin-bottom:1rem;text-transform:capitalize}
-.chart-wrapper canvas{width:100%!important;height:450px!important}
+/* Chart.js sizes the chart to this box, so it must hold only the canvas. */
+.chart-box{position:relative;height:450px}
 .chart-legend{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 8px;margin-bottom:12px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
 .chart-legend label{display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border-radius:6px;font-size:11px;color:var(--text-soft);cursor:pointer;user-select:none;white-space:nowrap;transition:opacity .15s,background .15s}
 .chart-legend label:hover{background:var(--surface-alt)}
@@ -59,6 +61,7 @@ h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;text-align:center}
 <script src="common.js"></script>
 <script src="reminder.js"></script>
 <script src="notes.js"></script>
+<script src="chart-tip.js"></script>
 <script>
 function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
   const chart = new Chart(canvas.getContext('2d'), {
@@ -69,16 +72,15 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Daily Hours',
           data: data.daily,
-          borderColor: cssVar('--chart-daily'),
-          backgroundColor: cssVar('--chart-daily-fill'),
+          ...themed({ borderColor: '--chart-daily', backgroundColor: '--chart-daily-fill' }),
           fill: true,
           tension: 0.12,
-          ...noteDotOptions(user.username, startIdx, 1.5, 4, cssVar('--chart-daily-fill'))
+          ...noteDotOptions(user.username, startIdx, 1.5, 4)
         },
         {
           label: 'Daily Goal (' + goals.daily + 'h)',
           data: new Array(labels.length).fill(goals.daily),
-          borderColor: cssVar('--chart-ink'),
+          ...themed({ borderColor: '--chart-ink' }),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
           pointRadius: 0,
@@ -96,7 +98,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Weekly Goal (' + goals.weekly + 'h)',
           data: new Array(labels.length).fill(goals.weekly),
-          borderColor: cssVar('--chart-ink'),
+          ...themed({ borderColor: '--chart-ink' }),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
           pointRadius: 0,
@@ -105,7 +107,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Monthly Hours',
           data: data.monthlyLine,
-          borderColor: cssVar('--chart-monthly'),
+          ...themed({ borderColor: '--chart-monthly' }),
           backgroundColor: 'rgba(142,68,173,0.06)',
           fill: false,
           tension: 0.12,
@@ -129,14 +131,12 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         tooltip: {
           mode: 'index',
           intersect: false,
-          titleFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
-          bodyFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
-          footerFont: { family: "'Courier New', Courier, monospace", size: 13, weight: 'bold' },
-          callbacks: {
-            label: function(ctx) {
-              return ctx.dataset.label + ': ' + formatDuration(ctx.parsed.y * 60);
-            }
-          }
+          enabled: false,
+          external: chartTipHandler(user, startIdx, (date, i) => [
+            { dataset: 0, name: 'Daily', hours: data.daily[i], goal: goals.daily, track: true },
+            { dataset: 2, name: 'Week ' + isoWeek(date), hours: data.weeklyLine[i], goal: goals.weekly, track: true },
+            { dataset: 4, name: date.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' }), hours: data.monthlyLine[i], goal: goals.monthly, track: true }
+          ])
         },
         legend: {
           display: false
@@ -188,8 +188,11 @@ function render(startIdx, endIdx) {
     legend.className = 'chart-legend';
     wrapper.appendChild(legend);
 
+    const box = document.createElement('div');
+    box.className = 'chart-box';
     const canvas = document.createElement('canvas');
-    wrapper.appendChild(canvas);
+    box.appendChild(canvas);
+    wrapper.appendChild(box);
     container.appendChild(wrapper);
 
     renderChart(canvas, labels, {

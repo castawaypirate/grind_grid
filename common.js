@@ -240,6 +240,50 @@ function applyChartTheme() {
   Chart.defaults.borderColor = cssVar('--chart-grid');
 }
 
+// Chart colors from theme.css: spread themed({ borderColor: '--chart-daily' }) into a dataset. It sets the colors
+// and keeps the token names, so a theme change can recolor the chart in place (recolorCharts).
+function themed(tokens) {
+  const colors = { themeTokens: tokens };
+  for (const [prop, token] of Object.entries(tokens)) colors[prop] = cssVar(token);
+  return colors;
+}
+
+// Legend swatches to repaint after a recolor, by chart.
+const legendPainters = new WeakMap();
+
+// Gives a drawn chart the current theme's colors without drawing it from scratch.
+function recolorChart(chart) {
+  const text = cssVar('--chart-text');
+  const grid = cssVar('--chart-grid');
+  // Each chart keeps the axis colors it resolved when it was made, so they are set on it directly.
+  for (const scale of Object.values(chart.options.scales)) {
+    scale.ticks.color = text;
+    scale.title.color = text;
+    scale.grid.color = grid;
+    scale.border.color = grid;
+  }
+  for (const dataset of chart.data.datasets) {
+    for (const [prop, token] of Object.entries(dataset.themeTokens || {})) dataset[prop] = cssVar(token);
+  }
+  chart.update('none');
+  legendPainters.get(chart)?.();
+}
+
+// Charts on screen are recolored at once, inside the theme fade; the rest when the browser is idle,
+// so the fade can start sooner. Each takes the theme current when its turn comes.
+function recolorCharts() {
+  applyChartTheme();
+  const onScreen = chart => {
+    const r = chart.canvas.getBoundingClientRect();
+    return r.bottom > 0 && r.top < window.innerHeight;
+  };
+  const later = fn => window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 500 }) : setTimeout(fn, 50);
+  for (const chart of activeCharts) {
+    if (onScreen(chart)) recolorChart(chart);
+    else later(() => activeCharts.includes(chart) && recolorChart(chart));
+  }
+}
+
 function destroyCharts() {
   activeCharts.forEach(chart => chart.destroy());
   activeCharts.length = 0;
@@ -247,6 +291,7 @@ function destroyCharts() {
 
 function renderLegend(chart, legendEl) {
   legendEl.innerHTML = '';
+  const swatches = [];
 
   chart.data.datasets.forEach((dataset, i) => {
     const item = document.createElement('label');
@@ -254,11 +299,10 @@ function renderLegend(chart, legendEl) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = true;
-    checkbox.style.accentColor = dataset.borderColor;
 
     const line = document.createElement('span');
     line.className = 'legend-line' + (dataset.borderDash ? ' dashed' : '');
-    line.style.borderTopColor = dataset.borderColor;
+    swatches.push({ checkbox, line, dataset });
 
     const text = document.createElement('span');
     text.className = 'legend-text';
@@ -273,6 +317,13 @@ function renderLegend(chart, legendEl) {
     item.append(checkbox, line, text);
     legendEl.appendChild(item);
   });
+
+  const paint = () => swatches.forEach(({ checkbox, line, dataset }) => {
+    checkbox.style.accentColor = dataset.borderColor;
+    line.style.borderTopColor = dataset.borderColor;
+  });
+  paint();
+  legendPainters.set(chart, paint);
 }
 
 // Loads data.json into jsonData and DATA_START.
@@ -305,20 +356,13 @@ async function initRangePage({ render, errorEl, onData }) {
     render(startIdx, endIdx);
   }
 
-  // Charts take their colors when they are drawn, so draw them again in the new theme.
-  // They are drawn at once, without growing in again: the page fades between the themes instead (theme.js).
-  // The check keeps an old cached page without theme.js working.
+  // A theme change recolors the charts in place; this runs while the page fades (theme.js), so it has to be quick.
+  // A page without charts is drawn again. The check keeps an old cached page without theme.js working.
   if (typeof onThemeChange === 'function') {
     onThemeChange(() => {
       if (!shownRange) return;
-      if (typeof Chart === 'undefined') return draw(...shownRange);
-      const animation = Chart.defaults.animation;
-      Chart.defaults.animation = false;
-      try {
-        draw(...shownRange);
-      } finally {
-        Chart.defaults.animation = animation;
-      }
+      if (activeCharts.length) recolorCharts();
+      else draw(...shownRange);
     });
   }
 

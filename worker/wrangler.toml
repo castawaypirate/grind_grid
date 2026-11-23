@@ -1,3 +1,10 @@
 name = "grind-grid-notes"
 main = "notes-worker.js"
 compatibility_date = "2026-11-01"
+
+# Passcode attempts allowed per visitor (by IP address) per minute: /verify and every save count, right or wrong.
+# Cloudflare only allows a period of 10 or 60 seconds; namespace_id is any number unique to this account.
+[[ratelimits]]
+name = "PASSCODE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }

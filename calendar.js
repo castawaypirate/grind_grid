@@ -571,6 +571,7 @@ function saveMeeting(change) {
         throw new Error('wrong passcode');
       }
       if (res.status === 409) throw new Error('conflict');
+      if (res.status === 429) throw new Error('too many tries, wait a minute');
       if (!res.ok) throw new Error('server error');
     } catch (err) {
       if (err.message === 'conflict') {
@@ -587,7 +588,7 @@ function saveMeeting(change) {
       }
       renderAll();
       if (openDay) showDayState();
-      const reason = err.message === 'wrong passcode' ? err.message : 'connection problem';
+      const reason = ['wrong passcode', 'too many tries, wait a minute'].includes(err.message) ? err.message : 'connection problem';
       showToast('Meeting not saved (' + reason + ').');
     }
   });

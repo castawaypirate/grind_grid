@@ -1,5 +1,6 @@
 // Saves day notes (notes.json) and meetings (meetings.json) in the repo, so the GitHub key never reaches a browser.
 // Secrets (set with `wrangler secret put`): GITHUB_TOKEN, NOTES_PASSCODE.
+// PASSCODE_LIMITER (wrangler.toml) caps passcode attempts, so the passcode can't be found by trying many.
 const CONTENTS_URL = 'https://api.github.com/repos/castawaypirate/grind_grid/contents/';
 const BRANCH = 'main';
 const USERNAMES = new Set(['castawaypirate', 'barbalias', 'Spl4sssh', 'jimmy_hawkins']);
@@ -206,6 +207,12 @@ export default {
       };
       const handler = request.method === 'POST' && Object.hasOwn(handlers, pathname) ? handlers[pathname] : null;
       if (!handler) return json(request, 404, { error: 'Not found' });
+
+      // Counted before the passcode is checked, so a blocked visitor learns nothing about their guesses.
+      if (!env.PASSCODE_LIMITER) throw new Error('PASSCODE_LIMITER is missing: deploy with wrangler.toml');
+      const visitor = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const { success } = await env.PASSCODE_LIMITER.limit({ key: visitor });
+      if (!success) return json(request, 429, { error: 'Too many tries, wait a minute' });
 
       if (!await passcodeMatches(request, env)) return json(request, 401, { error: 'Wrong passcode' });
       return await handler(request, env);

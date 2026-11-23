@@ -194,13 +194,14 @@ function saveNote(username, date, text, previous) {
         writeStorage(PASSCODE_KEY, null);
         throw new Error('wrong passcode');
       }
+      if (res.status === 429) throw new Error('too many tries, wait a minute');
       if (!res.ok) throw new Error('server error');
       setDraft(username, date, null);
     } catch (err) {
       setDraft(username, date, text);
       if (noteFor(username, date) === text) setNote(username, date, previous);
       refreshNoteDots();
-      const reason = err.message === 'wrong passcode' ? err.message : 'connection problem';
+      const reason = ['wrong passcode', 'too many tries, wait a minute'].includes(err.message) ? err.message : 'connection problem';
       showToast('Note not saved (' + reason + '). Your text is kept for next time.');
     }
   });

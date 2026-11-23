@@ -10,6 +10,8 @@ const GROUP_TIME_ZONE_LABEL = 'Athens time';
 const API_URL = 'https://grind-grid-notes.castawayfocuspirate-a34.workers.dev';
 const PASSCODE_KEY = 'grindgrid.notesPasscode';
 const TOAST_MS = 5000;
+// The worker allows a few passcode tries a minute (worker/wrangler.toml) and answers 429 after that.
+const TOO_MANY_TRIES = 'Too many tries, wait a minute';
 const MEETINGS_LOAD_TIMEOUT_MS = 5000;
 const activeCharts = [];
 let DATA_START = null;
@@ -50,7 +52,9 @@ async function checkPasscode(passcode) {
       writeStorage(PASSCODE_KEY, passcode);
       return null;
     }
-    return res.status === 401 ? 'Wrong passcode' : 'Server error';
+    if (res.status === 401) return 'Wrong passcode';
+    if (res.status === 429) return TOO_MANY_TRIES;
+    return 'Server error';
   } catch (e) {
     return 'Connection problem';
   }

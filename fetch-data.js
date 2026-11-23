@@ -15,7 +15,7 @@ function randomSleep(min, max) {
 const USERS = [
   { username: 'castawaypirate', displayName: 'CastawayPirate', habit: 'Noodling' },
   { username: 'barbalias', displayName: 'Barbalias', habit: 'USMLE STEP 1' },
-  { username: 'Spl4sssh', displayName: 'Spl4sssh', habit: 'Worked on "the end of me" project' },
+  { username: 'Spl4sssh', displayName: 'Spl4sssh', habit: 'Creating Worlds' },
   { username: 'jimmy_hawkins', displayName: 'Jimmy_hawkins', habit: 'Research' }
 ];
 

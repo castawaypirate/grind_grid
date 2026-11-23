@@ -1,13 +1,6 @@
 {
   "castawaypirate": [
     {
-      "id": "a4d0b1a4",
-      "kind": "custom",
-      "start": "2025-05-11",
-      "end": "2026-11-29",
-      "minutes": 126660
-    },
-    {
       "id": "d39ee1d6",
       "kind": "month",
       "start": "2026-11-01",

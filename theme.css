@@ -24,6 +24,8 @@
   --chart-daily:#2c3e50;
   --chart-daily-fill:rgba(44,62,80,0.10);
   --chart-weekly:#27ae60;
+  /* Goal lines are warm (orange for the week, gold for the month) so they stand apart from the cool hours lines. */
+  --chart-weekly-goal:#d35400;
   --chart-monthly:#8e44ad;
   --chart-monthly-goal:#d4a017;
   --chart-free:#999;
@@ -55,6 +57,7 @@
   --chart-daily:#a5b4cb;
   --chart-daily-fill:rgba(165,180,203,0.12);
   --chart-weekly:#4ade80;
+  --chart-weekly-goal:#fb923c;
   --chart-monthly:#b77fd6;
   --chart-monthly-goal:#ffd700;
   --chart-free:#7c8499;

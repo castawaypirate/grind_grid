@@ -105,7 +105,7 @@ function renderChart(canvas, labels, data, goals, legendEl, user, startIdx) {
         {
           label: 'Weekly Goal (' + weeklyGoal + 'h)',
           data: new Array(labels.length).fill(weeklyGoal),
-          ...themed({ borderColor: '--chart-ink' }),
+          ...themed({ borderColor: '--chart-weekly-goal' }),
           backgroundColor: 'rgba(218,165,32,0.06)',
           fill: false,
           pointRadius: 0,

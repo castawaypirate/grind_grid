@@ -9,11 +9,14 @@ function randomSleep(min, max) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+// habit is the title of the habit to chart (case and spaces around it don't matter). Everyone has several habits
+// and the API doesn't list them in a fixed order, so it's picked by title. If someone renames theirs, the fetch
+// fails with a "Habit not found" error listing their habits, and this needs the new title.
 const USERS = [
-  { username: 'castawaypirate', displayName: 'CastawayPirate' },
-  { username: 'barbalias', displayName: 'Barbalias' },
-  { username: 'Spl4sssh', displayName: 'Spl4sssh' },
-  { username: 'jimmy_hawkins', displayName: 'Jimmy_hawkins' }
+  { username: 'castawaypirate', displayName: 'CastawayPirate', habit: 'Noodling' },
+  { username: 'barbalias', displayName: 'Barbalias', habit: 'USMLE STEP 1' },
+  { username: 'Spl4sssh', displayName: 'Spl4sssh', habit: 'Worked on "the end of me" project' },
+  { username: 'jimmy_hawkins', displayName: 'Jimmy_hawkins', habit: 'Research' }
 ];
 
 // Hours a day. The pages make the weekly goal 7 days of it and each month's goal that month's days of it.
@@ -41,22 +44,29 @@ function apiChanged(username, what) {
   return new Error(`API changed for ${username}: ${what}`);
 }
 
-function checkShape(username, body) {
+const sameTitle = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+// Returns the user's habit (user.habit) from the API's answer.
+function pickHabit({ username, habit: wanted }, body) {
   const data = body?.result?.data;
   if (!data || typeof data !== 'object') throw apiChanged(username, 'no result.data in the response');
   if (!Array.isArray(data.habits)) throw apiChanged(username, 'result.data.habits is missing or not a list');
-  if (!data.habits.length) throw new Error(`No habits for ${username}`);
-  const habit = data.habits[0];
-  if (typeof habit.title !== 'string') throw apiChanged(username, 'the habit has no title');
+  if (data.habits.some(h => typeof h?.title !== 'string')) throw apiChanged(username, 'a habit has no title');
+  const habit = data.habits.find(h => sameTitle(h.title, wanted));
+  if (!habit) {
+    const titles = data.habits.map(h => JSON.stringify(h.title.trim())).join(', ') || 'none';
+    throw new Error(`Habit not found for ${username}: no habit titled ${JSON.stringify(wanted)} (their habits: ${titles}). Update USERS in fetch-data.js`);
+  }
   if (habit.heatmap != null && !Array.isArray(habit.heatmap)) throw apiChanged(username, 'the habit heatmap is not a list');
   for (const e of habit.heatmap || []) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(e?.day)) throw apiChanged(username, `heatmap day ${JSON.stringify(e?.day)} is not YYYY-MM-DD`);
     if (e.value != null && typeof e.value !== 'number') throw apiChanged(username, `heatmap value ${JSON.stringify(e.value)} is not a number`);
   }
-  return data;
+  return habit;
 }
 
-async function fetchUserData(username) {
+async function fetchUserData(user) {
+  const { username } = user;
   const url = 'https://www.lifeofdiscipline.com/api/trpc/profile.getProfilePageForUsername?input='
     + encodeURIComponent(JSON.stringify({ username }));
   let res;
@@ -73,16 +83,16 @@ async function fetchUserData(username) {
   } catch (err) {
     throw apiChanged(username, 'the response is not JSON');
   }
-  return checkShape(username, body);
+  return pickHabit(user, body);
 }
 
-async function fetchUserDataWithRetry(username) {
+async function fetchUserDataWithRetry(user) {
   try {
-    return await fetchUserData(username);
+    return await fetchUserData(user);
   } catch (err) {
-    console.error(`Retrying ${username} after error: ${err.message}`);
+    console.error(`Retrying ${user.username} after error: ${err.message}`);
     await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-    return fetchUserData(username);
+    return fetchUserData(user);
   }
 }
 
@@ -109,8 +119,8 @@ async function main() {
   if (process.env.SKIP_SLEEP !== 'true') await randomSleep(SLEEP_MIN, SLEEP_MAX);
   const rawResults = await Promise.all(USERS.map(async u => {
     try {
-      const data = await fetchUserDataWithRetry(u.username);
-      return { ...u, data };
+      const habit = await fetchUserDataWithRetry(u);
+      return { ...u, habit };
     } catch (err) {
       console.error('Failed to fetch ' + u.username + ': ' + err.message);
       return null;
@@ -129,8 +139,8 @@ async function main() {
 
   let globalStart = null;
   let unfinished = 0;
-  for (const { data } of validResults) {
-    const hm = data.habits[0].heatmap || [];
+  for (const { habit } of validResults) {
+    const hm = habit.heatmap || [];
     for (const e of hm) {
       const d = new Date(e.day + 'T00:00:00Z');
       if (d > lastDay) {
@@ -154,7 +164,7 @@ async function main() {
   }
 
   const users = validResults.map(u =>
-    processHabit(u.username, u.displayName, u.data.habits[0], globalStart, globalEnd)
+    processHabit(u.username, u.displayName, u.habit, globalStart, globalEnd)
   );
 
   const fs = require('fs');

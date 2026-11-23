@@ -45,6 +45,7 @@ jobs:
             echo
             echo '"API changed" means lifeofdiscipline.com answered in a shape fetch-data.js does not know, so the script needs updating.'
             echo '"Site not reachable" or "Site error" usually clears up by itself on a later run.'
+            echo '"Habit not found" means someone renamed or removed the habit being charted: put its new title in USERS in fetch-data.js.'
             echo
             echo '```'
             if [ -s fetch.log ]; then grep -v '^Sleeping' fetch.log | tail -n 20; else echo 'No fetch output (an earlier step failed).'; fi

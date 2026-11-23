@@ -1,1 +1,11 @@
-{}
+{
+  "castawaypirate": [
+    {
+      "id": "70b2f02c",
+      "kind": "month",
+      "start": "2026-11-01",
+      "end": "2026-11-30",
+      "minutes": 7375
+    }
+  ]
+}

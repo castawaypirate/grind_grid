@@ -7,6 +7,10 @@ on:
 
 permissions:
   contents: write
+  issues: write
+
+env:
+  FAILURE_ISSUE_TITLE: Nightly data fetch failed
 
 jobs:
   fetch-and-commit:
@@ -16,7 +20,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
-      - run: node fetch-data.js
+      - run: node fetch-data.js 2>&1 | tee fetch.log
+        shell: bash
         env:
           SKIP_SLEEP: ${{ github.event_name == 'workflow_dispatch' }}
       - run: |
@@ -26,3 +31,37 @@ jobs:
           git diff --quiet && git diff --staged --quiet || git commit -m "chore: update chart data"
           git pull --rebase
           git push
+
+      # One open issue while the fetch keeps failing: opened on the first failure, a comment on each one after,
+      # closed by the next run that works. The issue notifies the repo's watchers.
+      - name: Report the failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "The nightly fetch failed, so data.json was left as it was. [Run log]($RUN_URL)"
+            echo
+            echo '"API changed" means lifeofdiscipline.com answered in a shape fetch-data.js does not know, so the script needs updating.'
+            echo '"Site not reachable" or "Site error" usually clears up by itself on a later run.'
+            echo
+            echo '```'
+            if [ -s fetch.log ]; then grep -v '^Sleeping' fetch.log | tail -n 20; else echo 'No fetch output (an earlier step failed).'; fi
+            echo '```'
+          } > report.md
+          issue=$(gh issue list --state open --json number,title --jq ".[] | select(.title == \"$FAILURE_ISSUE_TITLE\") | .number" | head -n 1)
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file report.md
+          else
+            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file report.md
+          fi
+
+      - name: Close the failure issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for issue in $(gh issue list --state open --json number,title --jq ".[] | select(.title == \"$FAILURE_ISSUE_TITLE\") | .number"); do
+            gh issue close "$issue" --comment "Fixed: the fetch worked again on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done

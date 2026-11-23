@@ -1,4 +1,4 @@
-// Saves day notes (notes.json) and meetings (meetings.json) in the repo, so the GitHub key never reaches a browser.
+// Saves day notes (notes.json), meetings (meetings.json) and goals (goals.json) in the repo, so the GitHub key never reaches a browser.
 // Secrets (set with `wrangler secret put`): GITHUB_TOKEN, NOTES_PASSCODE.
 // PASSCODE_LIMITER (wrangler.toml) caps passcode attempts, so the passcode can't be found by trying many.
 const CONTENTS_URL = 'https://api.github.com/repos/castawaypirate/grind_grid/contents/';
@@ -7,6 +7,11 @@ const USERNAMES = new Set(['castawaypirate', 'barbalias', 'Spl4sssh', 'jimmy_haw
 const MAX_NOTE_LENGTH = 200;
 const MAX_SAVE_ATTEMPTS = 3;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const GOAL_KINDS = new Set(['week', 'month', 'custom']);
+const MAX_CUSTOM_GOALS = 3;
+const CUSTOM_MONTHS_AHEAD = 3;
+// The group's time zone (common.js and fetch-data.js have the same setting): "this week" and "today" are its days.
+const GROUP_TIME_ZONE = 'Europe/Athens';
 const ALLOWED_ORIGIN = /^(https:\/\/castawaypirate\.github\.io|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/;
 
 function corsHeaders(request) {
@@ -84,19 +89,19 @@ function applyNote(notes, username, date, text) {
   return updated;
 }
 
-// change(data) returns the new contents, or null when there is nothing to write.
+// change(data) returns the new contents, or null when there is nothing to write. Returns the file's contents after.
 async function updateJsonFile(env, file, message, change) {
   for (let attempt = 1; attempt <= MAX_SAVE_ATTEMPTS; attempt++) {
     const { data, sha } = await readJsonFile(env, file);
     const updated = change(data);
-    if (!updated) return;
+    if (!updated) return data;
 
     const res = await fetch(CONTENTS_URL + file, {
       method: 'PUT',
       headers: { ...githubHeaders(env), 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, content: encodeContent(updated), sha, branch: BRANCH })
     });
-    if (res.ok) return;
+    if (res.ok) return updated;
     // 409 (or 422 when two saves race to create the file) means someone else changed it after we read it, so read it again.
     if (res.status !== 409 && res.status !== 422) throw new Error('GitHub write of ' + file + ' failed: HTTP ' + res.status);
   }
@@ -184,6 +189,133 @@ async function handleMeetingSave(request, env) {
   return json(request, 200, { ok: true });
 }
 
+// --- Goals ---
+// goals.json is { username: [{ id, kind, start, end, minutes }] }: reach minutes logged from start to end (both
+// included). A week goal runs Monday to Sunday, a month goal 1st to last; a custom one from any start to a deadline.
+
+function addDays(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function groupToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: GROUP_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+function weekStartOf(dateStr) {
+  return addDays(dateStr, -((new Date(dateStr + 'T00:00:00Z').getUTCDay() + 6) % 7));
+}
+
+function monthEndOf(dateStr) {
+  const [y, m] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+
+// The same day some months later, or that month's last day when it is shorter (31 Aug + 3 months = 30 Nov).
+function addMonths(dateStr, months) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
+
+function daysInRange(start, end) {
+  return Math.round((new Date(end + 'T00:00:00Z') - new Date(start + 'T00:00:00Z')) / 86400000) + 1;
+}
+
+// Thrown inside a goals change: a request that doesn't fit the goals on the server (status 409) or is wrong (400).
+class GoalError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Checks a goal from the browser and returns it as stored (without id), or throws a GoalError.
+// Week and month goals can only be set for the current ones; a custom deadline is today up to 3 months ahead.
+function checkGoal(goal, today) {
+  const { kind, start, end, minutes } = goal || {};
+  if (!GOAL_KINDS.has(kind)) throw new GoalError(400, 'Invalid goal kind');
+  if (!isRealDate(start) || !isRealDate(end) || start > end) throw new GoalError(400, 'Invalid goal dates');
+  if (kind === 'week' && (start !== weekStartOf(today) || end !== addDays(start, 6))) throw new GoalError(400, 'A week goal is for this week');
+  if (kind === 'month' && (start !== today.slice(0, 8) + '01' || end !== monthEndOf(today))) throw new GoalError(400, 'A month goal is for this month');
+  if (kind === 'custom' && (start > today || end < today || end > addMonths(today, CUSTOM_MONTHS_AHEAD))) {
+    throw new GoalError(400, 'A custom goal starts by today and ends today to 3 months ahead');
+  }
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > daysInRange(start, end) * 1440) throw new GoalError(400, 'Invalid goal hours');
+  return { kind, start, end, minutes };
+}
+
+function sortGoals(goals) {
+  const order = { week: 0, month: 1, custom: 2 };
+  return [...goals].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0) || order[a.kind] - order[b.kind] || (a.end < b.end ? -1 : 1));
+}
+
+// Returns the user's goals after the change. A week or month goal replaces the one already set for that week or
+// month; a custom goal with an id replaces that goal, one without is a new one (up to 3 still running).
+function applyGoalChange(userGoals, body, today) {
+  if (body.action === 'delete') {
+    if (!userGoals.some(g => g.id === body.id)) throw new GoalError(409, 'That goal was already deleted');
+    return userGoals.filter(g => g.id !== body.id);
+  }
+  if (body.action !== 'set') throw new GoalError(400, 'Invalid action');
+
+  const goal = checkGoal(body.goal, today);
+  const id = body.goal.id;
+  let rest;
+  if (goal.kind === 'custom' && id !== undefined) {
+    const old = userGoals.find(g => g.id === id);
+    if (!old || old.kind !== 'custom') throw new GoalError(409, 'That goal was deleted');
+    if (old.end < today) throw new GoalError(409, 'That goal has ended');
+    rest = userGoals.filter(g => g.id !== id);
+  } else if (goal.kind === 'custom') {
+    if (userGoals.filter(g => g.kind === 'custom' && g.end >= today).length >= MAX_CUSTOM_GOALS) {
+      throw new GoalError(409, 'There are already ' + MAX_CUSTOM_GOALS + ' custom goals running');
+    }
+    rest = userGoals;
+  } else {
+    rest = userGoals.filter(g => !(g.kind === goal.kind && g.start === goal.start));
+  }
+  const kept = id !== undefined && goal.kind === 'custom' ? id : crypto.randomUUID().slice(0, 8);
+  return sortGoals([...rest, { id: kept, ...goal }]);
+}
+
+function goalMessage(username, body) {
+  if (body.action === 'delete') return `chore: delete a goal for ${username}`;
+  const { kind, start, end } = body.goal;
+  return `chore: set ${kind} goal for ${username} (${start} to ${end})`;
+}
+
+async function handleGoalSave(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return json(request, 400, { error: 'Invalid JSON' });
+  }
+  const { username } = body || {};
+  if (!USERNAMES.has(username)) return json(request, 400, { error: 'Unknown user' });
+  if (body.action === 'delete' && typeof body.id !== 'string') return json(request, 400, { error: 'Invalid goal id' });
+  if (body.action === 'set' && body.goal?.id !== undefined && typeof body.goal.id !== 'string') return json(request, 400, { error: 'Invalid goal id' });
+
+  const today = groupToday();
+  let saved;
+  try {
+    saved = await updateJsonFile(env, 'goals.json', goalMessage(username, body), goals => {
+      const before = goals[username] || [];
+      const after = applyGoalChange(before, body, today);
+      const updated = { ...goals };
+      if (after.length) updated[username] = after;
+      else delete updated[username];
+      return sortedByKey(updated);
+    });
+  } catch (err) {
+    if (err instanceof GoalError) return json(request, err.status, { error: err.message });
+    throw err;
+  }
+  return json(request, 200, { ok: true, goals: saved[username] || [] });
+}
+
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
@@ -199,10 +331,14 @@ export default {
       if (request.method === 'GET' && pathname === '/meetings') {
         return json(request, 200, (await readJsonFile(env, 'meetings.json')).data);
       }
+      if (request.method === 'GET' && pathname === '/goals') {
+        return json(request, 200, (await readJsonFile(env, 'goals.json')).data);
+      }
 
       const handlers = {
         '/notes': handleSave,
         '/meetings': handleMeetingSave,
+        '/goals': handleGoalSave,
         '/verify': () => json(request, 200, { ok: true })
       };
       const handler = request.method === 'POST' && Object.hasOwn(handlers, pathname) ? handlers[pathname] : null;

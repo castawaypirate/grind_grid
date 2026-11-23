@@ -35,14 +35,45 @@ function startOfCurrentYearUTC() {
   return new Date(Date.UTC(n.getUTCFullYear(), 0, 1));
 }
 
+// The API isn't a public one and can change without notice. Errors say which it was: the site not answering,
+// or an answer in a shape this script doesn't know (the API changed, so this script needs updating).
+function apiChanged(username, what) {
+  return new Error(`API changed for ${username}: ${what}`);
+}
+
+function checkShape(username, body) {
+  const data = body?.result?.data;
+  if (!data || typeof data !== 'object') throw apiChanged(username, 'no result.data in the response');
+  if (!Array.isArray(data.habits)) throw apiChanged(username, 'result.data.habits is missing or not a list');
+  if (!data.habits.length) throw new Error(`No habits for ${username}`);
+  const habit = data.habits[0];
+  if (typeof habit.title !== 'string') throw apiChanged(username, 'the habit has no title');
+  if (habit.heatmap != null && !Array.isArray(habit.heatmap)) throw apiChanged(username, 'the habit heatmap is not a list');
+  for (const e of habit.heatmap || []) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(e?.day)) throw apiChanged(username, `heatmap day ${JSON.stringify(e?.day)} is not YYYY-MM-DD`);
+    if (e.value != null && typeof e.value !== 'number') throw apiChanged(username, `heatmap value ${JSON.stringify(e.value)} is not a number`);
+  }
+  return data;
+}
+
 async function fetchUserData(username) {
   const url = 'https://www.lifeofdiscipline.com/api/trpc/profile.getProfilePageForUsername?input='
     + encodeURIComponent(JSON.stringify({ username }));
-  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${username}`);
-  const data = (await res.json()).result.data;
-  if (!data.habits?.length) throw new Error(`No habits for ${username}`);
-  return data;
+  let res;
+  try {
+    res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  } catch (err) {
+    throw new Error(`Site not reachable for ${username}: ${err.cause?.message || err.message}`);
+  }
+  if (res.status === 404) throw apiChanged(username, 'HTTP 404 (endpoint or user gone)');
+  if (!res.ok) throw new Error(`Site error for ${username}: HTTP ${res.status}`);
+  let body;
+  try {
+    body = await res.json();
+  } catch (err) {
+    throw apiChanged(username, 'the response is not JSON');
+  }
+  return checkShape(username, body);
 }
 
 async function fetchUserDataWithRetry(username) {
@@ -59,18 +90,19 @@ function processHabit(username, displayName, habit, globalStart, globalEnd) {
   const hm = habit.heatmap || [];
   const map = {};
   for (const e of hm) {
-    map[e.day] = (e.value || 0) / 60;
+    map[e.day] = e.value || 0;
   }
 
-  // The pages work out the weekly and monthly running totals from daily (index.html).
-  const daily = [];
+  // Whole minutes, so totals over any range are exact; the pages turn them into hours (loadData in common.js)
+  // and work out the weekly and monthly running totals from them (index.html).
+  const dailyMinutes = [];
   const cur = new Date(globalStart);
   while (cur <= globalEnd) {
-    daily.push(+(map[cur.toISOString().slice(0, 10)] || 0).toFixed(2));
+    dailyMinutes.push(Math.round(map[cur.toISOString().slice(0, 10)] || 0));
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
 
-  return { username, displayName, habitTitle: habit.title.trim(), daily };
+  return { username, displayName, habitTitle: habit.title.trim(), dailyMinutes };
 }
 
 async function main() {

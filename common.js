@@ -327,12 +327,17 @@ function renderLegend(chart, legendEl) {
 }
 
 // Loads data.json into jsonData and DATA_START.
+// data.json has each user's dailyMinutes; the pages use user.daily, the same days in hours.
 async function loadData() {
   const res = await fetch('data.json');
   if (!res.ok) throw new Error('Failed to load data.json');
   jsonData = await res.json();
 
   if (!jsonData.startDate) throw new Error('data.json is missing startDate');
+  // An older cached data.json already has daily in hours.
+  for (const user of jsonData.users) {
+    if (user.dailyMinutes) user.daily = user.dailyMinutes.map(m => m / 60);
+  }
   DATA_START = new Date(jsonData.startDate + 'T00:00:00Z');
 }
 

@@ -27,7 +27,8 @@ const GOAL_TABS = [
 let goals = {};
 let goalsWritable = false;
 let dataEnd = null;
-// The open popup: { user, tab, custom } where custom is null (the list), 'new', or the id of the goal being edited.
+// The open popup: { user, tab, custom, afterUnlock } where custom is null (the list), 'new', or the id of the goal
+// being edited. With afterUnlock ({ title, run }) the popup only asks for the passcode, then closes and calls run().
 let goalForm = null;
 let goalBoxEls = null;
 
@@ -339,8 +340,12 @@ function pastRow(user, goal) {
 }
 
 async function deletePastGoal(user, goal, button) {
+  // Ask for the passcode, then carry on with this delete rather than show the goal form.
   if (!canEditGoals()) {
-    openGoalBox(user, goal.kind, null);
+    openGoalBox(user, goal.kind, null, {
+      title: 'Delete "' + goalName(user, goal) + '"',
+      run: () => deletePastGoal(user, goal, button)
+    });
     return;
   }
   if (!confirm('Delete "' + goalName(user, goal) + '"? This can\'t be undone.')) return;
@@ -480,8 +485,14 @@ function getGoalBoxEls() {
     const form = goalForm;
     const message = await checkPasscode(passcode.value);
     if (goalForm !== form) return;
-    if (message) status.textContent = message;
-    else showGoalForm();
+    if (message) {
+      status.textContent = message;
+    } else if (form.afterUnlock) {
+      closeGoalBox();
+      form.afterUnlock.run();
+    } else {
+      showGoalForm();
+    }
   });
 
   const status = el('div', 'goal-status');
@@ -493,9 +504,9 @@ function getGoalBoxEls() {
   return goalBoxEls;
 }
 
-function openGoalBox(user, tab, custom) {
+function openGoalBox(user, tab, custom, afterUnlock = null) {
   if (!goalsWritable) return;
-  goalForm = { user, tab, custom };
+  goalForm = { user, tab, custom, afterUnlock };
   getGoalBoxEls().box.hidden = false;
   showGoalForm();
 }
@@ -507,9 +518,10 @@ function closeGoalBox() {
 }
 
 function showGoalForm() {
-  const { title, tabButtons, body, unlock, passcode, status } = getGoalBoxEls();
-  const { user, tab, custom } = goalForm;
-  title.textContent = 'Set a goal for ' + user.displayName;
+  const { title, tabs, tabButtons, body, unlock, passcode, status } = getGoalBoxEls();
+  const { user, tab, custom, afterUnlock } = goalForm;
+  title.textContent = afterUnlock ? afterUnlock.title : 'Set a goal for ' + user.displayName;
+  tabs.hidden = !!afterUnlock;
   tabButtons.forEach(t => t.setAttribute('aria-selected', String(t.dataset.kind === tab)));
   status.textContent = '';
 

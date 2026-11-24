@@ -103,6 +103,11 @@ function shortRange(start, end) {
   return shortDate(start) + ' – ' + shortDate(end);
 }
 
+// "Sun 22 Nov".
+function dayLabel(dateStr) {
+  return utcDate(dateStr).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }) + ' ' + shortDate(dateStr);
+}
+
 function monthName(dateStr) {
   const sameYear = dateStr.slice(0, 4) === groupToday().slice(0, 4);
   return utcDate(dateStr).toLocaleDateString('en-GB', { month: 'long', year: sameYear ? undefined : 'numeric', timeZone: 'UTC' });
@@ -288,6 +293,7 @@ function goalRow(user, goal) {
   );
 
   const need = el('div', 'goal-need');
+  let why = null;
   if (reached) {
     need.classList.add('reached');
     need.textContent = 'Goal reached 🎉' + (p.remaining < 0 ? ' +' + formatMinutes(-p.remaining) + ' over' : '');
@@ -296,17 +302,18 @@ function goalRow(user, goal) {
     need.textContent = 'Out of reach: it would take ' + formatMinutes(p.perDay) + ' a day for ' + p.daysLeft + ' day' + (p.daysLeft === 1 ? '' : 's');
   } else {
     need.append('Need ', el('strong', '', formatMinutes(p.perDay) + '/day'), ' for ' + p.daysLeft + ' day' + (p.daysLeft === 1 ? '' : 's'));
-    // How the newest day moved it: up after a short day, down after a long one.
+    // How the newest day moved it: a short day leaves more for each day left (red), a long one less (green).
     if (p.was !== null && p.was !== p.perDay) {
       const up = p.perDay > p.was;
-      const day = utcDate(dataEnd).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }) + ' ' + shortDate(dataEnd);
-      need.appendChild(el('span', 'goal-was ' + (up ? 'up' : 'down'),
-        ' · ' + (up ? 'up' : 'down') + ' from ' + formatMinutes(p.was) + ' (' + formatShort(p.lastDayMinutes) + ' logged on ' + day + ')'));
+      why = el('div', 'goal-was ' + (up ? 'up' : 'down'),
+        dayLabel(dataEnd) + ': logged ' + formatShort(p.lastDayMinutes) + ' of the ' + formatShort(p.was) + ' needed, so each day left needs '
+        + formatShort(Math.abs(p.perDay - p.was)) + (up ? ' more' : ' less'));
     }
   }
 
   row.append(line, progressBar(p.logged / goal.minutes, reached), need);
-  row.setAttribute('aria-label', goalName(user, goal) + ': ' + line.lastChild.textContent + '. ' + need.textContent + '. Edit');
+  if (why) row.appendChild(why);
+  row.setAttribute('aria-label', goalName(user, goal) + ': ' + line.lastChild.textContent + '. ' + need.textContent + (why ? '. ' + why.textContent : '') + '. Edit');
   row.disabled = !goalsWritable;
   row.addEventListener('click', () => openGoalBox(user, goal.kind, goal.kind === 'custom' ? goal.id : null));
   return row;
@@ -320,7 +327,15 @@ function emptyRow(user, kind) {
   return row;
 }
 
-// A finished goal: its final total, ✓ or ✗ and by how much, and a Delete button.
+// "⏳ waiting for Sun 22 Nov’s hours": the goal's days that data.json doesn't have yet.
+function waitingNote(goal) {
+  const first = maxDate(goal.start, addDays(dataEnd, 1));
+  const days = first === goal.end ? dayLabel(goal.end) + '’s hours' : 'the hours of ' + shortRange(first, goal.end);
+  return el('span', 'waiting', '⏳ waiting for ' + days);
+}
+
+// A finished goal: its final total, ✓ or ✗ and by how much, and a Delete button. A goal ends at midnight but its last
+// day's hours come with the nightly fetch hours later; until then it waits for them rather than show a wrong ✗.
 function pastRow(user, goal) {
   const logged = loggedMinutes(user, goal.start, goal.end);
   const met = logged >= goal.minutes;
@@ -329,7 +344,9 @@ function pastRow(user, goal) {
   text.append(
     el('span', 'goal-name', goalName(user, goal)),
     ' ' + formatMinutes(logged) + ' / ' + formatMinutes(goal.minutes) + ' ',
-    el('span', met ? 'met' : 'missed', (met ? '✓ +' : '✗ −') + formatMinutes(Math.abs(logged - goal.minutes)))
+    goal.end > dataEnd
+      ? waitingNote(goal)
+      : el('span', met ? 'met' : 'missed', (met ? '✓ +' : '✗ −') + formatMinutes(Math.abs(logged - goal.minutes)))
   );
   const del = el('button', 'btn btn-danger btn-small', 'Delete');
   del.type = 'button';

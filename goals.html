@@ -49,7 +49,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .goal-need{font-size:0.85rem;color:var(--text-soft)}
 .goal-need strong{color:var(--text)}
 .goal-need.reached{color:var(--success);font-weight:600}
-.goal-was{color:var(--muted)}
+.goal-was{margin-top:2px;font-size:0.85rem;color:var(--muted)}
 .goal-was.up{color:var(--error-text)}
 .goal-was.down{color:var(--success)}
 .goal-need.out-of-reach{color:var(--error-text);font-weight:600}
@@ -61,6 +61,7 @@ h1{font-size:1.75rem;font-weight:700;text-align:center}
 .past-text .goal-name{font-size:0.85rem;color:var(--text);margin-right:4px}
 .met{color:var(--success);font-weight:600}
 .missed{color:var(--error-text);font-weight:600}
+.waiting{color:var(--muted);font-weight:600}
 
 #goalBox{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;width:680px;max-width:calc(100vw - 2rem);max-height:calc(100vh - 2rem);overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
 #goalBox[hidden],.goal-tabs[hidden],.goal-body[hidden],.goal-unlock[hidden]{display:none}

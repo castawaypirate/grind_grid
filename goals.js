@@ -293,6 +293,7 @@ function goalRow(user, goal) {
   );
 
   const need = el('div', 'goal-need');
+  let why = null;
   if (reached) {
     need.classList.add('reached');
     need.textContent = 'Goal reached 🎉' + (p.remaining < 0 ? ' +' + formatMinutes(-p.remaining) + ' over' : '');
@@ -301,16 +302,18 @@ function goalRow(user, goal) {
     need.textContent = 'Out of reach: it would take ' + formatMinutes(p.perDay) + ' a day for ' + p.daysLeft + ' day' + (p.daysLeft === 1 ? '' : 's');
   } else {
     need.append('Need ', el('strong', '', formatMinutes(p.perDay) + '/day'), ' for ' + p.daysLeft + ' day' + (p.daysLeft === 1 ? '' : 's'));
-    // How the newest day moved it: up after a short day, down after a long one.
+    // How the newest day moved it: a short day leaves more for each day left (red), a long one less (green).
     if (p.was !== null && p.was !== p.perDay) {
       const up = p.perDay > p.was;
-      need.appendChild(el('span', 'goal-was ' + (up ? 'up' : 'down'),
-        ' · ' + (up ? 'up' : 'down') + ' from ' + formatMinutes(p.was) + ' (' + formatShort(p.lastDayMinutes) + ' logged on ' + dayLabel(dataEnd) + ')'));
+      why = el('div', 'goal-was ' + (up ? 'up' : 'down'),
+        dayLabel(dataEnd) + ': logged ' + formatShort(p.lastDayMinutes) + ' of the ' + formatShort(p.was) + ' needed, so each day left needs '
+        + formatShort(Math.abs(p.perDay - p.was)) + (up ? ' more' : ' less'));
     }
   }
 
   row.append(line, progressBar(p.logged / goal.minutes, reached), need);
-  row.setAttribute('aria-label', goalName(user, goal) + ': ' + line.lastChild.textContent + '. ' + need.textContent + '. Edit');
+  if (why) row.appendChild(why);
+  row.setAttribute('aria-label', goalName(user, goal) + ': ' + line.lastChild.textContent + '. ' + need.textContent + (why ? '. ' + why.textContent : '') + '. Edit');
   row.disabled = !goalsWritable;
   row.addEventListener('click', () => openGoalBox(user, goal.kind, goal.kind === 'custom' ? goal.id : null));
   return row;
